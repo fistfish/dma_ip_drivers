@@ -42,25 +42,28 @@ ifneq ($(KERNELRELEASE),)
 	$(TARGET_MODULE)-objs := libxdma.o xdma_cdev.o cdev_ctrl.o cdev_events.o cdev_sgdma.o cdev_xvc.o cdev_bypass.o xdma_mod.o xdma_thread.o
 	obj-m := $(TARGET_MODULE).o
 else
-	BUILDSYSTEM_DIR:=/lib/modules/$(shell uname -r)/build
+	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+	BUILDSYSTEM_DIR := $(KERNELDIR)
 	PWD:=$(shell pwd)
 all :
 	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) modules
 
 clean:
-	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) clean
+	@if [ -d "$(BUILDSYSTEM_DIR)" ]; then \
+		$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) clean; \
+	fi
 	@/bin/rm -f *.ko modules.order *.mod.c *.o *.o.ur-safe .*.o.cmd
 
 install: all
-	@rm -f /lib/modules/$(shell uname -r)/extra/xdma.ko
-	@echo "installing kernel modules to /lib/modules/$(shell uname -r)/xdma ..."
-	@mkdir -p -m 755 /lib/modules/$(shell uname -r)/xdma
-	@install -v -m 644 *.ko /lib/modules/$(shell uname -r)/xdma
+	@rm -f $(shell dirname $(KERNELDIR))/extra/xdma.ko
+	@echo "installing kernel modules to $(shell dirname $(KERNELDIR))/xdma ..."
+	@mkdir -p -m 755 $(shell dirname $(KERNELDIR))/xdma
+	@install -v -m 644 *.ko $(shell dirname $(KERNELDIR))/xdma
 	@depmod -a || true
 
 uninstall:
-	@echo "Un-installing /lib/modules/$(shell uname -r)/xdma ..."
-	@/bin/rm -rf /lib/modules/$(shell uname -r)/xdma
+	@echo "Un-installing $(shell dirname $(KERNELDIR))/xdma ..."
+	@/bin/rm -rf $(shell dirname $(KERNELDIR))/xdma
 	@depmod -a
 
 
