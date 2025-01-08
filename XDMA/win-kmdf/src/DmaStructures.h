@@ -12,7 +12,6 @@ Abstract:
 
 #include <ntddk.h>
 #include <wdf.h>
-#include <sal.h>
 
 // Forward declarations
 typedef struct _XDMA_DEVICE_CONTEXT XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
@@ -20,11 +19,19 @@ typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
 typedef struct _XDMA_TRANSFER XDMA_TRANSFER, *PXDMA_TRANSFER;
 typedef struct _XDMA_RESULT XDMA_RESULT, *PXDMA_RESULT;
 
+// Engine type information
+typedef struct _WDF_XDMA_ENGINE_TYPE_INFO {
+    ULONG UniqueType;
+    ULONG Version;
+    ULONG Features;
+    ULONG Reserved[5];
+} WDF_XDMA_ENGINE_TYPE_INFO, *PWDF_XDMA_ENGINE_TYPE_INFO;
+
 // Cyclic transfer callback
 typedef VOID (*PFN_XDMA_CYCLIC_CALLBACK)(
-    _In_ PVOID Context,
-    _In_ ULONG64 BytesTransferred,
-    _In_ NTSTATUS Status
+    PVOID Context,
+    ULONG64 BytesTransferred,
+    NTSTATUS Status
     );
 
 // Maximum transfer size per descriptor
@@ -35,6 +42,21 @@ typedef VOID (*PFN_XDMA_CYCLIC_CALLBACK)(
 #define XDMA_DESC_STOPPED     (1UL << 0)
 #define XDMA_DESC_COMPLETED   (1UL << 1)
 #define XDMA_DESC_EOP         (1UL << 4)
+
+// Engine control and interrupt enable bits
+#define XDMA_CTRL_RUN_STOP              (1UL << 0)
+#define XDMA_CTRL_IE_DESC_STOPPED       (1UL << 1)
+#define XDMA_CTRL_IE_DESC_COMPLETED     (1UL << 2)
+#define XDMA_CTRL_IE_DESC_ALIGN_MISMATCH (1UL << 3)
+#define XDMA_CTRL_IE_MAGIC_STOPPED      (1UL << 4)
+#define XDMA_CTRL_IE_IDLE_STOPPED       (1UL << 5)
+#define XDMA_CTRL_IE_READ_ERROR         (1UL << 6)
+#define XDMA_CTRL_IE_DESC_ERROR         (1UL << 7)
+
+// Channel and SGDMA offsets (from Linux driver)
+#define H2C_CHANNEL_OFFSET              0x1000
+#define CHANNEL_SPACING                 0x100
+#define SGDMA_OFFSET_FROM_CHANNEL       0x4000
 
 // DMA descriptor structure (matches Linux xdma_desc)
 typedef struct _XDMA_DESC {
@@ -110,6 +132,9 @@ typedef struct _XDMA_ENGINE_REGS {
     ULONG PerformanceDatLo;
     ULONG PerformancePndHi;
     ULONG PerformancePndLo;
+    
+    // Additional fields for interrupt handling
+    ULONG interrupt_enable_mask;    // Current interrupt enable mask
 } XDMA_ENGINE_REGS, *PXDMA_ENGINE_REGS;
 
 typedef struct _XDMA_ENGINE_SGDMA_REGS {
@@ -144,11 +169,18 @@ typedef struct _XDMA_ENGINE {
     ULONG InterruptEnableMaskValue; // Current interrupt mask
     
     // DMA resources
+    WDFDMAENABLER DmaEnabler;     // WDF DMA enabler
     ULONG DescMax;                // Maximum descriptors
     PXDMA_DESC DescriptorRing;    // Ring buffer of descriptors
     PHYSICAL_ADDRESS DescriptorRingPhys; // Physical address of ring
     WDFCOMMONBUFFER DescriptorBuffer; // Common buffer for descriptors
     LIST_ENTRY TransferQueue;      // Queue of pending transfers
+    SIZE_T DescriptorRingSize;    // Size of descriptor ring buffer
+    
+    // Device memory configuration
+    SIZE_T DeviceSize;           // Size of device memory region
+    PHYSICAL_ADDRESS DeviceAddress; // Physical address of device memory
+    BOOLEAN NonIncrementingAddr;  // Non-incrementing address mode
     
     // Cyclic transfer support
     PXDMA_RESULT CyclicResult;    // Cyclic result buffer
@@ -159,6 +191,9 @@ typedef struct _XDMA_ENGINE {
     ULONG64 BytesProcessed;       // Total bytes processed
     ULONG64 TotalTime;           // Total processing time
     
+    // Engine type information
+    WDF_XDMA_ENGINE_TYPE_INFO TypeInfo; // Engine type and capabilities
+    
     // Bypass mode
     ULONG BypassOffset;          // Bypass mode offset
 } XDMA_ENGINE, *PXDMA_ENGINE;
@@ -166,43 +201,53 @@ typedef struct _XDMA_ENGINE {
 // Function declarations
 NTSTATUS
 XdmaEngineCreate(
-    _In_ WDFDEVICE Device,
-    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
-    _In_ BOOLEAN IsH2C,
-    _In_ ULONG Channel,
-    _Out_ PXDMA_ENGINE *Engine
+    WDFDEVICE Device,
+    PXDMA_DEVICE_CONTEXT DeviceContext,
+    BOOLEAN IsH2C,
+    ULONG Channel,
+    PXDMA_ENGINE *Engine
     );
 
 VOID
 XdmaEngineDestroy(
-    _In_ PXDMA_ENGINE Engine
+    PXDMA_ENGINE Engine
+    );
+
+NTSTATUS
+XdmaEngineInit(
+    PXDMA_ENGINE Engine
+    );
+
+VOID
+XdmaEngineFreeResource(
+    PXDMA_ENGINE Engine
     );
 
 NTSTATUS
 XdmaTransferCreate(
-    _In_ PXDMA_ENGINE Engine,
-    _In_ WDFMEMORY Memory,
-    _In_ size_t Length,
-    _In_ BOOLEAN WriteToDevice,
-    _Out_ PXDMA_TRANSFER *Transfer
+    PXDMA_ENGINE Engine,
+    WDFMEMORY Memory,
+    size_t Length,
+    BOOLEAN WriteToDevice,
+    PXDMA_TRANSFER *Transfer
     );
 
 VOID
 XdmaTransferDestroy(
-    _In_ PXDMA_TRANSFER Transfer
+    PXDMA_TRANSFER Transfer
     );
 
 NTSTATUS
 XdmaTransferSubmit(
-    _In_ PXDMA_ENGINE Engine,
-    _In_ PXDMA_TRANSFER Transfer
+    PXDMA_ENGINE Engine,
+    PXDMA_TRANSFER Transfer
     );
 
 VOID
 XdmaTransferComplete(
-    _In_ PXDMA_ENGINE Engine,
-    _In_ PXDMA_TRANSFER Transfer,
-    _In_ NTSTATUS Status
+    PXDMA_ENGINE Engine,
+    PXDMA_TRANSFER Transfer,
+    NTSTATUS Status
     );
 
 #endif // __XDMA_DMA_STRUCTURES_H__

@@ -12,8 +12,53 @@ Abstract:
 #include "DmaStructures.h"
 #include "DmaOperations.h"
 
+// WDF DMA callback implementations
+NTSTATUS
+EvtXdmaTransactionConfigure(
+    WDFDMATRANSACTION Transaction,
+    WDFDEVICE Device,
+    PVOID Context,
+    WDF_DMA_DIRECTION Direction,
+    PSCATTER_GATHER_LIST SgList
+    )
+{
+    return XdmaTransactionConfigure(Transaction, Device, Context, Direction, SgList);
+}
+
+BOOLEAN
+EvtXdmaTransactionExecute(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context
+    )
+{
+    return XdmaTransactionExecute(Transaction, Context);
+}
+
+VOID
+EvtXdmaTransactionDmaTransferred(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
+    )
+{
+    XdmaTransactionDmaTransferred(Transaction, Context, Status);
+}
+
+VOID
+EvtXdmaTransactionDmaCompleted(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
+    )
+{
+    XdmaTransactionDmaCompleted(Transaction, Context, Status);
+}
+
 // Forward declarations
-static VOID XdmaSetupDescriptor(
+_Must_inspect_result_
+NTSTATUS
+NTAPI
+XdmaSetupDescriptor(
     _In_ PXDMA_DESC Descriptor,
     _In_ PHYSICAL_ADDRESS SrcAddr,
     _In_ PHYSICAL_ADDRESS DstAddr,

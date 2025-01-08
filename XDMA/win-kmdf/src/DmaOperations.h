@@ -9,71 +9,194 @@ Abstract:
 #ifndef __XDMA_DMA_OPERATIONS_H__
 #define __XDMA_DMA_OPERATIONS_H__
 
+#include <wdm.h>
 #include <ntddk.h>
 #include <wdf.h>
-#include <sal.h>
+#include <dmaapi.h>
 
-// Forward declarations
+// WDM type definitions
+#ifndef _PHYSICAL_ADDRESS_DEFINED
+#define _PHYSICAL_ADDRESS_DEFINED
+typedef LARGE_INTEGER PHYSICAL_ADDRESS, *PPHYSICAL_ADDRESS;
+#endif
+
+// WDF DMA types
+typedef enum _WDF_DMA_DIRECTION {
+    WdfDmaDirectionReadFromDevice = FALSE,
+    WdfDmaDirectionWriteToDevice = TRUE
+} WDF_DMA_DIRECTION;
+
+// DMA scatter/gather types
+typedef struct _SCATTER_GATHER_ELEMENT {
+    PHYSICAL_ADDRESS Address;
+    ULONG Length;
+    ULONG_PTR Reserved;
+} SCATTER_GATHER_ELEMENT, *PSCATTER_GATHER_ELEMENT;
+
+typedef struct _SCATTER_GATHER_LIST {
+    ULONG NumberOfElements;
+    ULONG_PTR Reserved;
+    SCATTER_GATHER_ELEMENT Elements[];
+} SCATTER_GATHER_LIST, *PSCATTER_GATHER_LIST;
+
+// Forward declarations for WDF types
+DECLARE_HANDLE(WDFDMATRANSACTION);
+DECLARE_HANDLE(WDFDEVICE);
+DECLARE_HANDLE(WDFMEMORY);
+
+// Forward declarations for XDMA types
 typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
 typedef struct _XDMA_TRANSFER XDMA_TRANSFER, *PXDMA_TRANSFER;
 typedef struct _XDMA_DESC XDMA_DESC, *PXDMA_DESC;
+typedef struct _XDMA_DEVICE_CONTEXT XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
+
+// Engine states
+typedef enum _XFER_STATE {
+    XFER_STATE_NEW = 0,
+    XFER_STATE_SUBMITTED,
+    XFER_STATE_COMPLETED,
+    XFER_STATE_FAILED,
+    XFER_STATE_ABORTED
+} XFER_STATE;
+
+// WDF type definitions
+typedef VOID (*PFN_XDMA_CYCLIC_CALLBACK)(
+    PVOID Context,
+    ULONG64 TotalBytes,
+    NTSTATUS Status
+    );
 
 #include "DmaStructures.h"
 
-EVT_WDF_DMA_TRANSACTION_CONFIGURE XdmaTransactionConfigure;
-EVT_WDF_DMA_TRANSACTION_EXECUTE XdmaTransactionExecute;
-EVT_WDF_DMA_TRANSACTION_DMA_TRANSFERRED XdmaTransactionDmaTransferred;
-EVT_WDF_DMA_TRANSACTION_DMA_COMPLETED XdmaTransactionDmaCompleted;
+EXTERN_C_START
 
+// WDF DMA callback declarations
 NTSTATUS
-XdmaSetupDescriptor(
-    _In_ PXDMA_DESC Descriptor,
-    _In_ PHYSICAL_ADDRESS SrcAddr,
-    _In_ PHYSICAL_ADDRESS DstAddr,
-    _In_ ULONG Length,
-    _In_ PHYSICAL_ADDRESS NextAddr,
-    _In_ BOOLEAN IsLast
+EvtXdmaTransactionConfigure(
+    WDFDMATRANSACTION Transaction,
+    WDFDEVICE Device,
+    PVOID Context,
+    WDF_DMA_DIRECTION Direction,
+    PSCATTER_GATHER_LIST SgList
     );
 
+BOOLEAN
+EvtXdmaTransactionExecute(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context
+    );
+
+VOID
+EvtXdmaTransactionDmaTransferred(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
+    );
+
+VOID
+EvtXdmaTransactionDmaCompleted(
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
+    );
+
+// Transaction functions
 NTSTATUS
 XdmaTransactionConfigure(
-    _In_ WDFDMATRANSACTION Transaction,
-    _In_ WDFDEVICE Device,
-    _In_ PVOID Context,
-    _In_ WDF_DMA_DIRECTION Direction,
-    _In_ PSCATTER_GATHER_LIST SgList
+    WDFDMATRANSACTION Transaction,
+    WDFDEVICE Device,
+    PVOID Context,
+    WDF_DMA_DIRECTION Direction,
+    PSCATTER_GATHER_LIST SgList
     );
 
 BOOLEAN
 XdmaTransactionExecute(
-    _In_ WDFDMATRANSACTION Transaction,
-    _In_ PVOID Context
+    WDFDMATRANSACTION Transaction,
+    PVOID Context
     );
 
 VOID
 XdmaTransactionDmaTransferred(
-    _In_ WDFDMATRANSACTION Transaction,
-    _In_ PVOID Context,
-    _In_ NTSTATUS Status
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
     );
 
 VOID
 XdmaTransactionDmaCompleted(
-    _In_ WDFDMATRANSACTION Transaction,
-    _In_ PVOID Context,
-    _In_ NTSTATUS Status
+    WDFDMATRANSACTION Transaction,
+    PVOID Context,
+    NTSTATUS Status
+    );
+
+// Engine functions
+NTSTATUS
+XdmaEngineCreate(
+    WDFDEVICE Device,
+    PXDMA_DEVICE_CONTEXT DeviceContext,
+    BOOLEAN IsH2C,
+    ULONG Channel,
+    PXDMA_ENGINE* Engine
+    );
+
+VOID
+XdmaEngineDestroy(
+    PXDMA_ENGINE Engine
     );
 
 NTSTATUS
-XdmaTransferCreate(
-    _In_ PXDMA_ENGINE Engine,
-    _In_ WDFMEMORY Memory,
-    _In_ size_t Length,
-    _In_ BOOLEAN WriteToDevice,
-    _In_ BOOLEAN IsCyclic,
-    _In_opt_ PFN_XDMA_CYCLIC_CALLBACK CyclicCallback,
-    _In_opt_ PVOID CyclicContext,
-    _Out_ PXDMA_TRANSFER *Transfer
+XdmaEngineInit(
+    PXDMA_ENGINE Engine
     );
+
+VOID
+XdmaEngineFreeResource(
+    PXDMA_ENGINE Engine
+    );
+
+// Transfer functions
+NTSTATUS
+XdmaTransferCreate(
+    PXDMA_ENGINE Engine,
+    WDFMEMORY Memory,
+    size_t Length,
+    BOOLEAN WriteToDevice,
+    BOOLEAN IsCyclic,
+    PFN_XDMA_CYCLIC_CALLBACK CyclicCallback,
+    PVOID CyclicContext,
+    PXDMA_TRANSFER* Transfer
+    );
+
+VOID
+XdmaTransferDestroy(
+    PXDMA_TRANSFER Transfer
+    );
+
+NTSTATUS
+XdmaTransferSubmit(
+    PXDMA_ENGINE Engine,
+    PXDMA_TRANSFER Transfer
+    );
+
+VOID
+XdmaTransferComplete(
+    PXDMA_ENGINE Engine,
+    PXDMA_TRANSFER Transfer,
+    NTSTATUS Status
+    );
+
+// Descriptor functions
+NTSTATUS
+XdmaSetupDescriptor(
+    PXDMA_DESC Descriptor,
+    PHYSICAL_ADDRESS SrcAddr,
+    PHYSICAL_ADDRESS DstAddr,
+    ULONG Length,
+    PHYSICAL_ADDRESS NextAddr,
+    BOOLEAN IsLast
+    );
+
+EXTERN_C_END
 
 #endif // __XDMA_DMA_OPERATIONS_H__

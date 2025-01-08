@@ -17,7 +17,21 @@ Environment:
 #include <initguid.h>
 #include "Public.h"
 #include "Trace.h"
+
+// WPP tracing setup
+#define WPP_CHECK_FOR_NULL_STRING  // to prevent exceptions due to NULL strings
+
+#if !defined(EVENT_TRACING)
+ULONG DebugLevel = TRACE_LEVEL_INFORMATION;
+ULONG DebugFlag = 0xff;
+#endif
+
 #include "Driver.tmh"  // Auto-generated WPP trace logging header
+
+// Suppress WPP related warnings
+#pragma warning(disable:4204)  // C4204 nonstandard extension used : non-constant aggregate initializer
+#pragma warning(disable:4214)  // C4214 nonstandard extension used : bit field types other than int
+
 #include "version.h"
 
 // Driver version information (from version.h)
