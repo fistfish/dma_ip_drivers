@@ -1,0 +1,78 @@
+;
+; xdma.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%ManufacturerName%
+CatalogFile=xdma.cat
+DriverVer=
+
+[DestinationDirs]
+DefaultDestDir = 12
+XDMA_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+xdma.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%XDMA.DeviceDesc%=XDMA_Device, PCI\VEN_10EE&DEV_9048
+%XDMA.DeviceDesc%=XDMA_Device, PCI\VEN_10EE&DEV_9044
+
+[XDMA_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+xdma.sys
+
+;-------------- Service installation
+[XDMA_Device.NT.Services]
+AddService = XDMA,%SPSVCINST_ASSOCSERVICE%, XDMA_Service_Inst
+
+; -------------- XDMA driver install sections
+[XDMA_Service_Inst]
+DisplayName    = %XDMA.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\xdma.sys
+
+;
+;--- XDMA_Device Coinstaller installation ------
+;
+
+[XDMA_Device.NT.CoInstallers]
+AddReg=XDMA_Device_CoInstaller_AddReg
+CopyFiles=XDMA_Device_CoInstaller_CopyFiles
+
+[XDMA_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[XDMA_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[XDMA_Device.NT.Wdf]
+KmdfService =  XDMA, XDMA_wdfsect
+
+[XDMA_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="Xilinx"
+DiskName = "XDMA Installation Disk"
+XDMA.DeviceDesc = "Xilinx XDMA"
+XDMA.SVCDESC = "Xilinx XDMA Service"
