@@ -1836,7 +1836,12 @@ static int enable_msi_msix(struct xdma_dev *xdev, struct pci_dev *pdev)
 		int req_nvec = xdev->c2h_channel_max + xdev->h2c_channel_max +
 			       xdev->user_max;
 
-#if KERNEL_VERSION(4, 12, 0) <= LINUX_VERSION_CODE
+#if KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE
+		/* For kernel 5.15+, use PCI_IRQ_MSIX | PCI_IRQ_AFFINITY */
+		dbg_init("Enabling MSI-X with affinity support\n");
+		rv = pci_alloc_irq_vectors(pdev, req_nvec, req_nvec,
+					   PCI_IRQ_MSIX | PCI_IRQ_AFFINITY);
+#elif KERNEL_VERSION(4, 12, 0) <= LINUX_VERSION_CODE
 		dbg_init("Enabling MSI-X\n");
 		rv = pci_alloc_irq_vectors(pdev, req_nvec, req_nvec,
 					   PCI_IRQ_MSIX);
@@ -2015,10 +2020,11 @@ static int irq_msix_channel_setup(struct xdma_dev *xdev)
 #else
 		vector = xdev->entry[i].vector;
 #endif
-		rv = request_irq(vector, xdma_channel_irq, 0, xdev->mod_name,
-				 engine);
+		/* Use IRQF_ONESHOT for MSI-X on kernel 5.15+ */
+		rv = request_irq(vector, xdma_channel_irq,
+				IRQF_ONESHOT, xdev->mod_name, engine);
 		if (rv) {
-			pr_info("requesti irq#%d failed %d, engine %s.\n",
+			pr_info("request irq#%d failed %d, engine %s.\n",
 				vector, rv, engine->name);
 			return rv;
 		}
@@ -2033,10 +2039,11 @@ static int irq_msix_channel_setup(struct xdma_dev *xdev)
 #else
 		vector = xdev->entry[j].vector;
 #endif
-		rv = request_irq(vector, xdma_channel_irq, 0, xdev->mod_name,
-				 engine);
+		/* Use IRQF_ONESHOT for MSI-X on kernel 5.15+ */
+		rv = request_irq(vector, xdma_channel_irq,
+				IRQF_ONESHOT, xdev->mod_name, engine);
 		if (rv) {
-			pr_info("requesti irq#%d failed %d, engine %s.\n",
+			pr_info("request irq#%d failed %d, engine %s.\n",
 				vector, rv, engine->name);
 			return rv;
 		}
@@ -2119,7 +2126,9 @@ static int irq_msi_setup(struct xdma_dev *xdev, struct pci_dev *pdev)
 	int rv;
 
 	xdev->irq_line = (int)pdev->irq;
-	rv = request_irq(pdev->irq, xdma_isr, 0, xdev->mod_name, xdev);
+	/* Use IRQF_ONESHOT for MSI on kernel 5.15+ */
+	rv = request_irq(pdev->irq, xdma_isr,
+			IRQF_ONESHOT, xdev->mod_name, xdev);
 	if (rv)
 		dbg_init("Couldn't use IRQ#%d, %d\n", pdev->irq, rv);
 	else
@@ -2159,8 +2168,9 @@ static int irq_legacy_setup(struct xdma_dev *xdev, struct pci_dev *pdev)
 	}
 
 	xdev->irq_line = (int)pdev->irq;
-	rv = request_irq(pdev->irq, xdma_isr, IRQF_SHARED, xdev->mod_name,
-			 xdev);
+	/* Use IRQF_SHARED | IRQF_ONESHOT for legacy interrupts on kernel 5.15+ */
+	rv = request_irq(pdev->irq, xdma_isr,
+			IRQF_SHARED | IRQF_ONESHOT, xdev->mod_name, xdev);
 	if (rv)
 		dbg_init("Couldn't use IRQ#%d, %d\n", pdev->irq, rv);
 	else

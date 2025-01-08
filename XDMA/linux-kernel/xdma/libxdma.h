@@ -59,6 +59,19 @@
 #	define PCI_AER_NAMECHANGE (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
 #endif
 
+/* Ubuntu 22.04 (kernel 5.15+) compatibility */
+#if defined(RHEL_RELEASE_CODE)
+#	define HAS_NEW_RESET_API (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8, 4))
+#else
+#	define HAS_NEW_RESET_API (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#endif
+
+#if defined(RHEL_RELEASE_CODE)
+#	define HAS_NEW_WAKE_API (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8, 4))
+#else
+#	define HAS_NEW_WAKE_API (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#endif
+
 #if	HAS_SWAKE_UP
 #include <linux/swait.h>
 #endif

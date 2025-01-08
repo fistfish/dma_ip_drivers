@@ -21,6 +21,15 @@ topdir := $(shell cd $(src)/.. && pwd)
 TARGET_MODULE:=xdma
 
 EXTRA_CFLAGS := -I$(topdir)/include $(XVC_FLAGS)
+# Add kernel version checks for 5.15+ and 5.16+ compatibility
+KERN_VER := $(shell uname -r | sed -r 's/^([0-9]+)\.([0-9]+).*/\1\2/')
+ifeq ($(shell test $(KERN_VER) -ge 515; echo $$?),0)
+	EXTRA_CFLAGS += -DHAS_KERNEL_5_15
+endif
+ifeq ($(shell test $(KERN_VER) -ge 516; echo $$?),0)
+	EXTRA_CFLAGS += -DHAS_KERNEL_5_16
+endif
+
 ifeq ($(DEBUG),1)
 	EXTRA_CFLAGS += -D__LIBXDMA_DEBUG__
 endif
@@ -43,7 +52,7 @@ clean:
 	@/bin/rm -f *.ko modules.order *.mod.c *.o *.o.ur-safe .*.o.cmd
 
 install: all
-	@rm -f /lib/modules/5.15.0-67-generic/extra/xdma.ko
+	@rm -f /lib/modules/$(shell uname -r)/extra/xdma.ko
 	@echo "installing kernel modules to /lib/modules/$(shell uname -r)/xdma ..."
 	@mkdir -p -m 755 /lib/modules/$(shell uname -r)/xdma
 	@install -v -m 644 *.ko /lib/modules/$(shell uname -r)/xdma

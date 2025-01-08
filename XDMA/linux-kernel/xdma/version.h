@@ -22,7 +22,7 @@
 
 #define DRV_MOD_MAJOR		2020
 #define DRV_MOD_MINOR		2
-#define DRV_MOD_PATCHLEVEL	2
+#define DRV_MOD_PATCHLEVEL	3  /* Updated for Ubuntu 22.04 (kernel 5.15+) support */
 
 #define DRV_MODULE_VERSION      \
 	__stringify(DRV_MOD_MAJOR) "." \

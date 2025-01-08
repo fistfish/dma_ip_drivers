@@ -105,10 +105,13 @@ static void async_io_handler(unsigned long  cb_hndl, int err)
 		res = caio->res;
 		res2 = caio->res2;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+		/* Ubuntu 22.04+ - single result with error handling */
 		caio->iocb->ki_complete(caio->iocb, caio->err_cnt ? res2 : res);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+		/* Legacy - separate result and error values */
 		caio->iocb->ki_complete(caio->iocb, res, res2);
 #else
+		/* Pre-4.1 - legacy completion */
 		aio_complete(caio->iocb, res, res2);
 #endif
 skip_tran:
@@ -122,10 +125,13 @@ skip_tran:
 
 skip_dev_lock:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+	/* Ubuntu 22.04+ - single error value */
 	caio->iocb->ki_complete(caio->iocb, -EBUSY);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+	/* Legacy - separate bytes and error values */
 	caio->iocb->ki_complete(caio->iocb, numbytes, -EBUSY);
 #else
+	/* Pre-4.1 - legacy completion */
 	aio_complete(caio->iocb, numbytes, -EBUSY);
 #endif
 	kmem_cache_free(cdev_cache, caio);
