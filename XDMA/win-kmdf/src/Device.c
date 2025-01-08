@@ -32,22 +32,23 @@ XdmaCreateDevice(
     ULONG vendorId, deviceId;
 
     // Get PCI device information using DEVPKEY
-    status = WdfFdoInitQueryProperty(DeviceInit,
-                                   &DEVPKEY_Device_VendorID,
-                                   DEVPROP_TYPE_UINT32,
-                                   sizeof(ULONG),
-                                   &vendorId,
-                                   NULL);
+    DEVPROPTYPE propertyType;
+    status = WdfFdoInitQueryPropertyEx(DeviceInit,
+                                     &DEVPKEY_Device_VendorID,
+                                     sizeof(ULONG),
+                                     &vendorId,
+                                     &propertyType,
+                                     NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }
 
-    status = WdfFdoInitQueryProperty(DeviceInit,
-                                   &DEVPKEY_Device_DeviceID,
-                                   DEVPROP_TYPE_UINT32,
-                                   sizeof(ULONG),
-                                   &deviceId,
-                                   NULL);
+    status = WdfFdoInitQueryPropertyEx(DeviceInit,
+                                     &DEVPKEY_Device_DeviceID,
+                                     sizeof(ULONG),
+                                     &deviceId,
+                                     &propertyType,
+                                     NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }
@@ -146,26 +147,26 @@ XdmaEvtInterruptIsr(
     if (interruptContext->IsUserInterrupt) {
         // Handle user interrupt (similar to xdma_user_irq)
         struct interrupt_regs *int_regs = 
-            (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
+            (struct interrupt_regs *)((PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
                                     XDMA_OFS_INT_CTRL);
         
         // Read and clear user interrupt status
-        u32 user_irq_status = READ_REGISTER_ULONG((PULONG)&int_regs->user_int_request);
+        u32 user_irq_status = READ_REGISTER_ULONG((volatile ULONG *)&int_regs->user_int_request);
         if (user_irq_status) {
-            WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_request, user_irq_status);
+            WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->user_int_request, user_irq_status);
             WdfInterruptQueueDpcForIsr(Interrupt);
             handled = TRUE;
         }
     } else {
         // Handle channel interrupt (similar to xdma_channel_irq)
         struct interrupt_regs *int_regs = 
-            (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
+            (struct interrupt_regs *)((PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
                                     XDMA_OFS_INT_CTRL);
         
         // Read and clear channel interrupt status
-        u32 channel_status = READ_REGISTER_ULONG((PULONG)&int_regs->channel_int_request);
+        u32 channel_status = READ_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_int_request);
         if (channel_status & (1 << interruptContext->ChannelId)) {
-            WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_request, 
+            WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_int_request, 
                                1 << interruptContext->ChannelId);
             WdfInterruptQueueDpcForIsr(Interrupt);
             handled = TRUE;
@@ -363,18 +364,18 @@ XdmaSetupMsixInterrupts(
 
     // Program MSI-X vectors in hardware (similar to prog_irq_msix_channel/user)
     struct interrupt_regs *int_regs = 
-        (struct interrupt_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + 
+        (struct interrupt_regs *)((PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + 
                                 XDMA_OFS_INT_CTRL);
 
     // Program channel vectors
     for (i = 0; i < DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax; i++) {
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_msi_vector[i/4],
+        WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_msi_vector[i/4],
                             (i & 0x1f) << ((i % 4) * 8));
     }
 
     // Program user vectors
     for (i = 0; i < DeviceContext->UserMax; i++) {
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_msi_vector[i/4],
+        WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->user_msi_vector[i/4],
                             (i & 0x1f) << ((i % 4) * 8));
     }
 
@@ -401,9 +402,9 @@ XdmaEvtDevicePrepareHardware(
     deviceContext = XdmaGetDeviceContext(Device);
     
     // Initialize BAR tracking
-    deviceContext->config_bar_idx = -1;
-    deviceContext->user_bar_idx = -1;
-    deviceContext->bypass_bar_idx = -1;
+    deviceContext->ConfigBarIdx = -1;
+    deviceContext->UserBarIdx = -1;
+    deviceContext->BypassBarIdx = -1;
 
     // Get number of resources
     ULONG resourceCount = WdfCmResourceListGetCount(ResourceListTranslated);
@@ -432,19 +433,19 @@ XdmaEvtDevicePrepareHardware(
         deviceContext->BarLength[bar_id_idx] = length;
 
         // Try to identify if this is the config BAR
-        if ((length >= XDMA_BAR_SIZE) && (deviceContext->config_bar_idx < 0)) {
+        if ((length >= XDMA_BAR_SIZE) && (deviceContext->ConfigBarIdx < 0)) {
             // Check if this BAR contains XDMA config registers
             struct interrupt_regs *irq_regs = 
                 (struct interrupt_regs *)((PUCHAR)virtualAddress + XDMA_OFS_INT_CTRL);
             struct config_regs *cfg_regs = 
                 (struct config_regs *)((PUCHAR)virtualAddress + XDMA_OFS_CONFIG);
 
-            ULONG irq_id = READ_REGISTER_ULONG((PULONG)&irq_regs->identifier);
-            ULONG cfg_id = READ_REGISTER_ULONG((PULONG)&cfg_regs->identifier);
+            ULONG irq_id = READ_REGISTER_ULONG((volatile ULONG *)&irq_regs->identifier);
+            ULONG cfg_id = READ_REGISTER_ULONG((volatile ULONG *)&cfg_regs->identifier);
 
             if (((irq_id & 0xffff0000) == IRQ_BLOCK_ID) &&
                 ((cfg_id & 0xffff0000) == CONFIG_BLOCK_ID)) {
-                deviceContext->config_bar_idx = bar_id_idx;
+                deviceContext->ConfigBarIdx = bar_id_idx;
                 config_bar_pos = bar_id_idx;
                 DbgPrint("XDMA config BAR found at index %d\n", bar_id_idx);
             }
@@ -455,7 +456,7 @@ XdmaEvtDevicePrepareHardware(
     }
 
     // The XDMA config BAR must be present
-    if (deviceContext->config_bar_idx < 0) {
+    if (deviceContext->ConfigBarIdx < 0) {
         DbgPrint("Failed to detect XDMA config BAR\n");
         status = STATUS_DEVICE_CONFIGURATION_ERROR;
         goto cleanup;
@@ -514,17 +515,17 @@ XdmaEvtDevicePrepareHardware(
 
     case 2:
         if (config_bar_pos == 0) {
-            deviceContext->bypass_bar_idx = bar_id_list[1];
+            deviceContext->BypassBarIdx = bar_id_list[1];
         } else if (config_bar_pos == 1) {
-            deviceContext->user_bar_idx = bar_id_list[0];
+            deviceContext->UserBarIdx = bar_id_list[0];
         }
         break;
 
     case 3:
     case 4:
         if ((config_bar_pos == 1) || (config_bar_pos == 2)) {
-            deviceContext->user_bar_idx = bar_id_list[0];
-            deviceContext->bypass_bar_idx = bar_id_list[bar_id_idx - 1];
+            deviceContext->UserBarIdx = bar_id_list[0];
+            deviceContext->BypassBarIdx = bar_id_list[bar_id_idx - 1];
         }
         break;
 
@@ -535,9 +536,9 @@ XdmaEvtDevicePrepareHardware(
 
     DbgPrint("%d BARs: config %d, user %d, bypass %d\n",
              bar_id_idx,
-             deviceContext->config_bar_idx,
-             deviceContext->user_bar_idx,
-             deviceContext->bypass_bar_idx);
+             deviceContext->ConfigBarIdx,
+             deviceContext->UserBarIdx,
+             deviceContext->BypassBarIdx);
 
     return status;
 
@@ -641,9 +642,9 @@ XdmaEvtDeviceReleaseHardware(
     }
 
     // Reset BAR indices
-    deviceContext->config_bar_idx = -1;
-    deviceContext->user_bar_idx = -1;
-    deviceContext->bypass_bar_idx = -1;
+    deviceContext->ConfigBarIdx = -1;
+    deviceContext->UserBarIdx = -1;
+    deviceContext->BypassBarIdx = -1;
 
     return STATUS_SUCCESS;
 }

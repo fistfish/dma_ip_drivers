@@ -105,22 +105,23 @@ XdmaEvtDriverDeviceAdd(
     PAGED_CODE();
 
     // Get PCI device information using DEVPKEY
-    status = WdfFdoInitQueryProperty(DeviceInit,
-                                   &DEVPKEY_Device_VendorID,
-                                   DEVPROP_TYPE_UINT32,
-                                   sizeof(ULONG),
-                                   &vendorId,
-                                   NULL);
+    DEVPROPTYPE propertyType;
+    status = WdfFdoInitQueryPropertyEx(DeviceInit,
+                                     &DEVPKEY_Device_VendorID,
+                                     sizeof(ULONG),
+                                     &vendorId,
+                                     &propertyType,
+                                     NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }
 
-    status = WdfFdoInitQueryProperty(DeviceInit,
-                                   &DEVPKEY_Device_DeviceID,
-                                   DEVPROP_TYPE_UINT32,
-                                   sizeof(ULONG),
-                                   &deviceId,
-                                   NULL);
+    status = WdfFdoInitQueryPropertyEx(DeviceInit,
+                                     &DEVPKEY_Device_DeviceID,
+                                     sizeof(ULONG),
+                                     &deviceId,
+                                     &propertyType,
+                                     NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }

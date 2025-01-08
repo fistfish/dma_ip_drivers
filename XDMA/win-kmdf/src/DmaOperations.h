@@ -12,7 +12,6 @@ Abstract:
 #include <wdm.h>
 #include <ntddk.h>
 #include <wdf.h>
-#include <dmaapi.h>
 
 // WDM type definitions
 #ifndef _PHYSICAL_ADDRESS_DEFINED

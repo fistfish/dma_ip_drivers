@@ -42,7 +42,7 @@ Abstract:
 // Function declarations
 NTSTATUS
 XdmaEngineInit(
-    _In_ PXDMA_ENGINE Engine,
+    _Out_ PXDMA_ENGINE* Engine,
     _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
     _In_ ULONG Offset,
     _In_ BOOLEAN IsH2C,
