@@ -1,0 +1,3369 @@
+From 96e0fb57cf1744095ec57fb8c474ffadac538b78 Mon Sep 17 00:00:00 2001
+From: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>
+Date: Wed, 8 Jan 2025 05:22:12 +0000
+Subject: [PATCH 1/2] Add Windows KMDF driver implementation
+
+- Create Windows driver project structure
+- Implement DMA operations and engine initialization
+- Add comprehensive build documentation
+- Configure project for Windows 10/11 (64-bit)
+- Set up driver signing process
+
+Co-Authored-By: Guan Wang <guan.wang.buaa@gmail.com>
+---
+ XDMA/win-kmdf/README.md           |  97 +++++
+ XDMA/win-kmdf/src/Device.c        | 688 ++++++++++++++++++++++++++++++
+ XDMA/win-kmdf/src/Device.h        | 142 ++++++
+ XDMA/win-kmdf/src/DmaOperations.c | 563 ++++++++++++++++++++++++
+ XDMA/win-kmdf/src/DmaOperations.h |  72 ++++
+ XDMA/win-kmdf/src/DmaStructures.h | 201 +++++++++
+ XDMA/win-kmdf/src/Driver.c        | 161 +++++++
+ XDMA/win-kmdf/src/Driver.h        |  21 +
+ XDMA/win-kmdf/src/EngineInit.c    | 191 +++++++++
+ XDMA/win-kmdf/src/EngineInit.h    |  71 +++
+ XDMA/win-kmdf/src/IoControl.c     | 306 +++++++++++++
+ XDMA/win-kmdf/src/Public.h        | 104 +++++
+ XDMA/win-kmdf/src/Trace.h         |  22 +
+ XDMA/win-kmdf/src/version.h       |  26 ++
+ XDMA/win-kmdf/src/xdma.inf        |  78 ++++
+ XDMA/win-kmdf/src/xdma.vcxproj    | 101 +++++
+ XDMA/win-kmdf/xdma_win.sln        |  24 ++
+ 17 files changed, 2868 insertions(+)
+ create mode 100644 XDMA/win-kmdf/README.md
+ create mode 100644 XDMA/win-kmdf/src/Device.c
+ create mode 100644 XDMA/win-kmdf/src/Device.h
+ create mode 100644 XDMA/win-kmdf/src/DmaOperations.c
+ create mode 100644 XDMA/win-kmdf/src/DmaOperations.h
+ create mode 100644 XDMA/win-kmdf/src/DmaStructures.h
+ create mode 100644 XDMA/win-kmdf/src/Driver.c
+ create mode 100644 XDMA/win-kmdf/src/Driver.h
+ create mode 100644 XDMA/win-kmdf/src/EngineInit.c
+ create mode 100644 XDMA/win-kmdf/src/EngineInit.h
+ create mode 100644 XDMA/win-kmdf/src/IoControl.c
+ create mode 100644 XDMA/win-kmdf/src/Public.h
+ create mode 100644 XDMA/win-kmdf/src/Trace.h
+ create mode 100644 XDMA/win-kmdf/src/version.h
+ create mode 100644 XDMA/win-kmdf/src/xdma.inf
+ create mode 100644 XDMA/win-kmdf/src/xdma.vcxproj
+ create mode 100644 XDMA/win-kmdf/xdma_win.sln
+
+diff --git a/XDMA/win-kmdf/README.md b/XDMA/win-kmdf/README.md
+new file mode 100644
+index 0000000..c1d310b
+--- /dev/null
++++ b/XDMA/win-kmdf/README.md
+@@ -0,0 +1,97 @@
++# XDMA Windows Driver Build Instructions
++
++## Prerequisites
++
++1. Visual Studio 2019 or later with the following components:
++   - Windows SDK 10.0.19041.0 or later
++   - MSVC v142 build tools or later
++   - Windows Universal CRT SDK
++
++2. Windows Driver Kit (WDK) 10.0.19041.0 or later
++   - Download from [Microsoft WDK](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk)
++   - Install Visual Studio Integration during WDK installation
++
++## Build Instructions
++
++1. Open Visual Studio Developer Command Prompt
++2. Navigate to the solution directory:
++   ```cmd
++   cd XDMA\win-kmdf
++   ```
++3. Build the driver:
++   ```cmd
++   msbuild xdma_win.sln /p:Configuration=Release /p:Platform=x64
++   ```
++
++## Driver Signing
++
++The driver must be signed for installation on Windows 10/11 64-bit systems.
++
++### Test Signing (Development)
++1. Create a test certificate:
++   ```cmd
++   makecert -r -pe -ss PrivateCertStore -n CN=XdmaTestCert xdma_test.cer
++   ```
++2. Sign the driver:
++   ```cmd
++   signtool sign /v /s PrivateCertStore /n XdmaTestCert /t http://timestamp.digicert.com x64/Release/xdma.sys
++   ```
++3. Enable test signing on target machine:
++   ```cmd
++   bcdedit /set testsigning on
++   ```
++
++### Production Signing
++For production deployment, the driver must be signed using:
++- Windows Hardware Compatibility Program (WHCP) submission
++- EV Code Signing Certificate
++- Hardware Dev Center Dashboard
++
++## Installation
++
++1. Copy the following files to the target system:
++   - `x64/Release/xdma.sys` (Driver binary)
++   - `x64/Release/xdma.inf` (Driver information file)
++   - `x64/Release/xdma.cat` (Security catalog)
++
++2. Install using Device Manager:
++   - Update driver for the Xilinx XDMA device
++   - Browse to the folder containing the driver files
++   - Select "Install this driver software anyway" if prompted
++
++## Troubleshooting
++
++1. Verify WDK installation:
++   ```cmd
++   where msbuild
++   where signtool
++   ```
++
++2. Common build errors:
++   - Missing WDK: Install WDK with Visual Studio integration
++   - Platform SDK not found: Install correct Windows SDK version
++   - Signing failed: Verify certificate and timestamp server availability
++
++3. Installation issues:
++   - Driver not loading: Check Event Viewer for details
++   - Code signing error: Verify test signing is enabled for development
++   - Device not found: Verify hardware presence and PCIe enumeration
++
++## Support
++
++For issues related to the XDMA driver, please use:
++- Xilinx PCIe Forum for hardware-specific questions
++- GitHub Issues for build-related problems
++
++## Version Information
++
++The driver version matches the Linux driver:
++- Major: 2020
++- Minor: 2
++- Patch: 3
++
++## Performance Considerations
++
++- Enable/disable debug prints using the 'Debug Print Filter' in registry
++- Configure DMA buffer sizes based on your application requirements
++- Monitor performance using Windows Performance Analyzer (WPA)
+diff --git a/XDMA/win-kmdf/src/Device.c b/XDMA/win-kmdf/src/Device.c
+new file mode 100644
+index 0000000..ec9e097
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Device.c
+@@ -0,0 +1,688 @@
++/*++
++Module Name:
++    Device.c
++
++Abstract:
++    Implementation of device-specific functions for XDMA driver
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "Device.h"
++#include "Public.h"
++#include "Trace.h"
++
++#ifdef ALLOC_PRAGMA
++#pragma alloc_text (PAGE, XdmaCreateDevice)
++#pragma alloc_text (PAGE, XdmaEvtDevicePrepareHardware)
++#pragma alloc_text (PAGE, XdmaEvtDeviceReleaseHardware)
++#pragma alloc_text (PAGE, XdmaEvtDeviceD0Entry)
++#pragma alloc_text (PAGE, XdmaEvtDeviceD0Exit)
++#endif
++
++NTSTATUS
++XdmaCreateDevice(
++    _Inout_ PWDFDEVICE_INIT DeviceInit
++    )
++{
++    WDF_OBJECT_ATTRIBUTES deviceAttributes;
++    PXDMA_DEVICE_CONTEXT deviceContext;
++    WDFDEVICE device;
++    NTSTATUS status;
++    ULONG vendorId, deviceId;
++
++    // Get PCI device information
++    status = WdfFdoInitQueryProperty(DeviceInit,
++                                   DevicePropertyVendorID,
++                                   sizeof(ULONG),
++                                   &vendorId,
++                                   NULL);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    status = WdfFdoInitQueryProperty(DeviceInit,
++                                   DevicePropertyDeviceID,
++                                   sizeof(ULONG),
++                                   &deviceId,
++                                   NULL);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Verify this is a supported Xilinx or AWS device
++    if (vendorId != XILINX_VENDOR_ID && vendorId != AWS_VENDOR_ID) {
++        return STATUS_DEVICE_CONFIGURATION_ERROR;
++    }
++
++    // For Xilinx vendor ID, verify device ID
++    if (vendorId == XILINX_VENDOR_ID) {
++        if (deviceId != XILINX_DEVICE_ID_1 && deviceId != XILINX_DEVICE_ID_2) {
++            return STATUS_DEVICE_CONFIGURATION_ERROR;
++        }
++    }
++
++    PAGED_CODE();
++
++    // Set PCI device properties
++    WdfDeviceInitSetDeviceType(DeviceInit, FILE_DEVICE_BUS_MASTER);
++    WdfDeviceInitSetExclusive(DeviceInit, FALSE);
++    
++    // Create the device object with our context type
++    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&deviceAttributes, XDMA_DEVICE_CONTEXT);
++    deviceAttributes.EvtCleanupCallback = XdmaEvtDeviceContextCleanup;
++
++    status = WdfDeviceCreate(&DeviceInit,
++                           &deviceAttributes,
++                           &device);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Initialize device context (maps to xpdev_alloc in Linux driver)
++    deviceContext = XdmaGetDeviceContext(device);
++    deviceContext->WdfDevice = device;
++    deviceContext->UserMax = MAX_USER_IRQ;
++    deviceContext->H2CChannelMax = XDMA_CHANNEL_NUM_MAX;
++    deviceContext->C2HChannelMax = XDMA_CHANNEL_NUM_MAX;
++
++    // Initialize BAR tracking
++    RtlZeroMemory(deviceContext->BarBasePA, sizeof(deviceContext->BarBasePA));
++    RtlZeroMemory(deviceContext->BarBaseVA, sizeof(deviceContext->BarBaseVA));
++    RtlZeroMemory(deviceContext->BarLength, sizeof(deviceContext->BarLength));
++
++    // Configure PnP/power callbacks
++    WDF_PNPPOWER_EVENT_CALLBACKS pnpPowerCallbacks;
++    WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnpPowerCallbacks);
++    pnpPowerCallbacks.EvtDevicePrepareHardware = XdmaEvtDevicePrepareHardware;
++    pnpPowerCallbacks.EvtDeviceReleaseHardware = XdmaEvtDeviceReleaseHardware;
++    pnpPowerCallbacks.EvtDeviceD0Entry = XdmaEvtDeviceD0Entry;
++    pnpPowerCallbacks.EvtDeviceD0Exit = XdmaEvtDeviceD0Exit;
++    WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnpPowerCallbacks);
++
++    // Create device interface (maps to xpdev_create_interfaces in Linux driver)
++    status = WdfDeviceCreateDeviceInterface(
++        device,
++        &GUID_DEVINTERFACE_XDMA,
++        NULL
++        );
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Create default queue for IOCTLs
++    WDF_IO_QUEUE_CONFIG queueConfig;
++    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
++    queueConfig.EvtIoDeviceControl = XdmaEvtIoDeviceControl;
++
++    status = WdfIoQueueCreate(device,
++                            &queueConfig,
++                            WDF_NO_OBJECT_ATTRIBUTES,
++                            WDF_NO_HANDLE);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    return status;
++}
++
++BOOLEAN
++XdmaEvtInterruptIsr(
++    _In_ WDFINTERRUPT Interrupt,
++    _In_ ULONG MessageID
++    )
++{
++    WDFDEVICE device;
++    PXDMA_DEVICE_CONTEXT deviceContext;
++    PXDMA_INTERRUPT_CONTEXT interruptContext;
++    BOOLEAN handled = FALSE;
++
++    device = WdfInterruptGetDevice(Interrupt);
++    deviceContext = XdmaGetDeviceContext(device);
++    interruptContext = XdmaGetInterruptContext(Interrupt);
++
++    if (interruptContext->IsUserInterrupt) {
++        // Handle user interrupt (similar to xdma_user_irq)
++        struct interrupt_regs *int_regs = 
++            (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
++                                    XDMA_OFS_INT_CTRL);
++        
++        // Read and clear user interrupt status
++        u32 user_irq_status = READ_REGISTER_ULONG((PULONG)&int_regs->user_int_request);
++        if (user_irq_status) {
++            WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_request, user_irq_status);
++            WdfInterruptQueueDpcForIsr(Interrupt);
++            handled = TRUE;
++        }
++    } else {
++        // Handle channel interrupt (similar to xdma_channel_irq)
++        struct interrupt_regs *int_regs = 
++            (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
++                                    XDMA_OFS_INT_CTRL);
++        
++        // Read and clear channel interrupt status
++        u32 channel_status = READ_REGISTER_ULONG((PULONG)&int_regs->channel_int_request);
++        if (channel_status & (1 << interruptContext->ChannelId)) {
++            WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_request, 
++                               1 << interruptContext->ChannelId);
++            WdfInterruptQueueDpcForIsr(Interrupt);
++            handled = TRUE;
++        }
++    }
++
++    return handled;
++}
++
++VOID
++XdmaEvtInterruptDpc(
++    _In_ WDFINTERRUPT Interrupt,
++    _In_ WDFOBJECT AssociatedObject
++    )
++{
++    UNREFERENCED_PARAMETER(AssociatedObject);
++    
++    WDFDEVICE device = WdfInterruptGetDevice(Interrupt);
++    PXDMA_DEVICE_CONTEXT deviceContext = XdmaGetDeviceContext(device);
++    PXDMA_INTERRUPT_CONTEXT interruptContext = XdmaGetInterruptContext(Interrupt);
++
++    if (interruptContext->IsUserInterrupt) {
++        // Process user interrupt (deferred work)
++        // TODO: Implement user interrupt processing
++    } else {
++        // Process channel interrupt (deferred work)
++        // TODO: Implement channel processing
++    }
++}
++
++NTSTATUS
++XdmaEvtInterruptEnable(
++    _In_ WDFINTERRUPT Interrupt,
++    _In_ WDFDEVICE AssociatedDevice
++    )
++{
++    UNREFERENCED_PARAMETER(AssociatedDevice);
++    
++    PXDMA_INTERRUPT_CONTEXT interruptContext = XdmaGetInterruptContext(Interrupt);
++    PXDMA_DEVICE_CONTEXT deviceContext = interruptContext->DeviceContext;
++    struct interrupt_regs *int_regs;
++
++    int_regs = (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
++                                       XDMA_OFS_INT_CTRL);
++
++    if (interruptContext->IsUserInterrupt) {
++        // Enable user interrupt
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_enable_w1s, 
++                            1 << interruptContext->ChannelId);
++    } else {
++        // Enable channel interrupt
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_enable_w1s,
++                            1 << interruptContext->ChannelId);
++    }
++
++    return STATUS_SUCCESS;
++}
++
++NTSTATUS
++XdmaEvtInterruptDisable(
++    _In_ WDFINTERRUPT Interrupt,
++    _In_ WDFDEVICE AssociatedDevice
++    )
++{
++    UNREFERENCED_PARAMETER(AssociatedDevice);
++    
++    PXDMA_INTERRUPT_CONTEXT interruptContext = XdmaGetInterruptContext(Interrupt);
++    PXDMA_DEVICE_CONTEXT deviceContext = interruptContext->DeviceContext;
++    struct interrupt_regs *int_regs;
++
++    int_regs = (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
++                                       XDMA_OFS_INT_CTRL);
++
++    if (interruptContext->IsUserInterrupt) {
++        // Disable user interrupt
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_enable_w1c,
++                            1 << interruptContext->ChannelId);
++    } else {
++        // Disable channel interrupt
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_enable_w1c,
++                            1 << interruptContext->ChannelId);
++    }
++
++    return STATUS_SUCCESS;
++}
++
++static VOID
++XdmaCleanupPartialInterrupts(
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ ULONG ChannelCount,
++    _In_ ULONG UserCount
++    )
++{
++    ULONG i;
++
++    // Clean up channel interrupts
++    for (i = 0; i < ChannelCount; i++) {
++        if (DeviceContext->ChannelInterrupt[i]) {
++            WdfObjectDelete(DeviceContext->ChannelInterrupt[i]);
++            DeviceContext->ChannelInterrupt[i] = NULL;
++        }
++    }
++
++    // Clean up user interrupts
++    for (i = 0; i < UserCount; i++) {
++        if (DeviceContext->UserInterrupt[i]) {
++            WdfObjectDelete(DeviceContext->UserInterrupt[i]);
++            DeviceContext->UserInterrupt[i] = NULL;
++        }
++    }
++}
++
++static NTSTATUS
++XdmaSetupMsixInterrupts(
++    _In_ WDFDEVICE Device,
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext
++    )
++{
++    NTSTATUS status;
++    WDF_INTERRUPT_CONFIG interruptConfig;
++    WDF_OBJECT_ATTRIBUTES attributes;
++    PXDMA_INTERRUPT_CONTEXT interruptContext;
++    ULONG i, vector;
++
++    // Set up channel interrupts
++    for (i = 0; i < DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax; i++) {
++        WDF_INTERRUPT_CONFIG_INIT(&interruptConfig,
++                                XdmaEvtInterruptIsr,
++                                XdmaEvtInterruptDpc);
++        
++        interruptConfig.InterruptTranslated = WdfCmResourceListGetDescriptor(
++            ResourceListTranslated, i);
++        interruptConfig.InterruptRaw = WdfCmResourceListGetDescriptor(
++            ResourceList, i);
++
++        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes,
++                                              XDMA_INTERRUPT_CONTEXT);
++
++        DbgPrint("Creating channel interrupt %d\n", i);
++        status = WdfInterruptCreate(Device,
++                                  &interruptConfig,
++                                  &attributes,
++                                  &DeviceContext->ChannelInterrupt[i]);
++        if (!NT_SUCCESS(status)) {
++            DbgPrint("Failed to create channel interrupt %d: 0x%x\n", i, status);
++            XdmaCleanupPartialInterrupts(DeviceContext, i, 0);
++            return status;
++        }
++
++        // Initialize interrupt context
++        interruptContext = XdmaGetInterruptContext(DeviceContext->ChannelInterrupt[i]);
++        interruptContext->DeviceContext = DeviceContext;
++        interruptContext->ChannelId = i;
++        interruptContext->IsUserInterrupt = FALSE;
++        interruptContext->Vector = i;
++    }
++
++    // Set up user interrupts
++    vector = DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax;
++    for (i = 0; i < DeviceContext->UserMax; i++, vector++) {
++        WDF_INTERRUPT_CONFIG_INIT(&interruptConfig,
++                                XdmaEvtInterruptIsr,
++                                XdmaEvtInterruptDpc);
++        
++        interruptConfig.InterruptTranslated = WdfCmResourceListGetDescriptor(
++            ResourceListTranslated, vector);
++        interruptConfig.InterruptRaw = WdfCmResourceListGetDescriptor(
++            ResourceList, vector);
++
++        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes,
++                                              XDMA_INTERRUPT_CONTEXT);
++
++        DbgPrint("Creating user interrupt %d\n", i);
++        status = WdfInterruptCreate(Device,
++                                  &interruptConfig,
++                                  &attributes,
++                                  &DeviceContext->UserInterrupt[i]);
++        if (!NT_SUCCESS(status)) {
++            DbgPrint("Failed to create user interrupt %d: 0x%x\n", i, status);
++            XdmaCleanupPartialInterrupts(DeviceContext, 
++                                       DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax,
++                                       i);
++            return status;
++        }
++
++        // Initialize interrupt context
++        interruptContext = XdmaGetInterruptContext(DeviceContext->UserInterrupt[i]);
++        interruptContext->DeviceContext = DeviceContext;
++        interruptContext->ChannelId = i;
++        interruptContext->IsUserInterrupt = TRUE;
++        interruptContext->Vector = vector;
++    }
++
++    // Program MSI-X vectors in hardware (similar to prog_irq_msix_channel/user)
++    struct interrupt_regs *int_regs = 
++        (struct interrupt_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + 
++                                XDMA_OFS_INT_CTRL);
++
++    // Program channel vectors
++    for (i = 0; i < DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax; i++) {
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_msi_vector[i/4],
++                            (i & 0x1f) << ((i % 4) * 8));
++    }
++
++    // Program user vectors
++    for (i = 0; i < DeviceContext->UserMax; i++) {
++        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_msi_vector[i/4],
++                            (i & 0x1f) << ((i % 4) * 8));
++    }
++
++    return STATUS_SUCCESS;
++}
++
++NTSTATUS
++XdmaEvtDevicePrepareHardware(
++    _In_ WDFDEVICE Device,
++    _In_ WDFCMRESLIST ResourceList,
++    _In_ WDFCMRESLIST ResourceListTranslated
++    )
++{
++    NTSTATUS status = STATUS_SUCCESS;
++    PXDMA_DEVICE_CONTEXT deviceContext;
++    PCM_PARTIAL_RESOURCE_DESCRIPTOR descriptor;
++    ULONG i;
++    int bar_id_list[XDMA_BAR_NUM] = {0};
++    int bar_id_idx = 0;
++    int config_bar_pos = 0;
++
++    PAGED_CODE();
++
++    deviceContext = XdmaGetDeviceContext(Device);
++    
++    // Initialize BAR tracking
++    deviceContext->config_bar_idx = -1;
++    deviceContext->user_bar_idx = -1;
++    deviceContext->bypass_bar_idx = -1;
++
++    // Get number of resources
++    ULONG resourceCount = WdfCmResourceListGetCount(ResourceListTranslated);
++
++    // Iterate through all resources
++    for (i = 0; i < resourceCount; i++) {
++        descriptor = WdfCmResourceListGetDescriptor(ResourceListTranslated, i);
++        
++        if (descriptor->Type != CmResourceTypeMemory)
++            continue;
++
++        // This is a BAR (memory resource)
++        PHYSICAL_ADDRESS physicalAddress = descriptor->u.Memory.Start;
++        SIZE_T length = descriptor->u.Memory.Length;
++        
++        // Map the BAR
++        PVOID virtualAddress = MmMapIoSpace(physicalAddress, length, MmNonCached);
++        if (!virtualAddress) {
++            status = STATUS_INSUFFICIENT_RESOURCES;
++            goto cleanup;
++        }
++
++        // Store BAR information
++        deviceContext->BarBasePA[bar_id_idx] = physicalAddress;
++        deviceContext->BarBaseVA[bar_id_idx] = virtualAddress;
++        deviceContext->BarLength[bar_id_idx] = length;
++
++        // Try to identify if this is the config BAR
++        if ((length >= XDMA_BAR_SIZE) && (deviceContext->config_bar_idx < 0)) {
++            // Check if this BAR contains XDMA config registers
++            struct interrupt_regs *irq_regs = 
++                (struct interrupt_regs *)((PUCHAR)virtualAddress + XDMA_OFS_INT_CTRL);
++            struct config_regs *cfg_regs = 
++                (struct config_regs *)((PUCHAR)virtualAddress + XDMA_OFS_CONFIG);
++
++            ULONG irq_id = READ_REGISTER_ULONG((PULONG)&irq_regs->identifier);
++            ULONG cfg_id = READ_REGISTER_ULONG((PULONG)&cfg_regs->identifier);
++
++            if (((irq_id & 0xffff0000) == IRQ_BLOCK_ID) &&
++                ((cfg_id & 0xffff0000) == CONFIG_BLOCK_ID)) {
++                deviceContext->config_bar_idx = bar_id_idx;
++                config_bar_pos = bar_id_idx;
++                DbgPrint("XDMA config BAR found at index %d\n", bar_id_idx);
++            }
++        }
++
++        bar_id_list[bar_id_idx] = bar_id_idx;
++        bar_id_idx++;
++    }
++
++    // The XDMA config BAR must be present
++    if (deviceContext->config_bar_idx < 0) {
++        DbgPrint("Failed to detect XDMA config BAR\n");
++        status = STATUS_DEVICE_CONFIGURATION_ERROR;
++        goto cleanup;
++    }
++
++    // Set up MSI-X interrupts
++    status = XdmaSetupMsixInterrupts(Device, deviceContext);
++    if (!NT_SUCCESS(status)) {
++        DbgPrint("Failed to set up MSI-X interrupts: 0x%x\n", status);
++        goto cleanup;
++    }
++
++    deviceContext->MsixEnabled = TRUE;
++
++    // Initialize DMA engines
++    ULONG engineOffset;
++    PXDMA_ENGINE engine;
++
++    // Initialize H2C engines
++    engineOffset = 0x0000;
++    for (i = 0; i < deviceContext->H2CChannelMax; i++) {
++        status = XdmaEngineInit(&engine,
++                               deviceContext,
++                               engineOffset,
++                               TRUE,  // H2C
++                               i);
++        if (!NT_SUCCESS(status)) {
++            DbgPrint("Failed to initialize H2C engine %d: 0x%x\n", i, status);
++            goto cleanup;
++        }
++        deviceContext->H2CEngines[i] = engine;
++        engineOffset += 0x100;  // Next engine offset
++    }
++
++    // Initialize C2H engines
++    engineOffset = 0x1000;
++    for (i = 0; i < deviceContext->C2HChannelMax; i++) {
++        status = XdmaEngineInit(&engine,
++                               deviceContext,
++                               engineOffset,
++                               FALSE,  // C2H
++                               i);
++        if (!NT_SUCCESS(status)) {
++            DbgPrint("Failed to initialize C2H engine %d: 0x%x\n", i, status);
++            goto cleanup;
++        }
++        deviceContext->C2HEngines[i] = engine;
++        engineOffset += 0x100;  // Next engine offset
++    }
++
++    // Identify user and bypass BARs based on config BAR position
++    switch (bar_id_idx) {
++    case 1:
++        // Only config BAR present
++        break;
++
++    case 2:
++        if (config_bar_pos == 0) {
++            deviceContext->bypass_bar_idx = bar_id_list[1];
++        } else if (config_bar_pos == 1) {
++            deviceContext->user_bar_idx = bar_id_list[0];
++        }
++        break;
++
++    case 3:
++    case 4:
++        if ((config_bar_pos == 1) || (config_bar_pos == 2)) {
++            deviceContext->user_bar_idx = bar_id_list[0];
++            deviceContext->bypass_bar_idx = bar_id_list[bar_id_idx - 1];
++        }
++        break;
++
++    default:
++        DbgPrint("Unexpected number of BARs (%d)\n", bar_id_idx);
++        break;
++    }
++
++    DbgPrint("%d BARs: config %d, user %d, bypass %d\n",
++             bar_id_idx,
++             deviceContext->config_bar_idx,
++             deviceContext->user_bar_idx,
++             deviceContext->bypass_bar_idx);
++
++    return status;
++
++cleanup:
++    // Clean up engines
++    for (i = 0; i < deviceContext->H2CChannelMax; i++) {
++        if (deviceContext->H2CEngines[i]) {
++            XdmaEngineFreeResource(deviceContext->H2CEngines[i]);
++            ExFreePoolWithTag(deviceContext->H2CEngines[i], 'AMDX');
++            deviceContext->H2CEngines[i] = NULL;
++        }
++    }
++    for (i = 0; i < deviceContext->C2HChannelMax; i++) {
++        if (deviceContext->C2HEngines[i]) {
++            XdmaEngineFreeResource(deviceContext->C2HEngines[i]);
++            ExFreePoolWithTag(deviceContext->C2HEngines[i], 'AMDX');
++            deviceContext->C2HEngines[i] = NULL;
++        }
++    }
++
++    // Unmap any mapped BARs
++    for (i = 0; i < XDMA_BAR_NUM; i++) {
++        if (deviceContext->BarBaseVA[i]) {
++            MmUnmapIoSpace(deviceContext->BarBaseVA[i],
++                          deviceContext->BarLength[i]);
++            deviceContext->BarBaseVA[i] = NULL;
++        }
++    }
++    return status;
++}
++
++static VOID
++XdmaCleanupInterrupts(
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext
++    )
++{
++    ULONG i;
++
++    // Clean up channel interrupts
++    for (i = 0; i < DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax; i++) {
++        if (DeviceContext->ChannelInterrupt[i]) {
++            WdfObjectDelete(DeviceContext->ChannelInterrupt[i]);
++            DeviceContext->ChannelInterrupt[i] = NULL;
++        }
++    }
++
++    // Clean up user interrupts
++    for (i = 0; i < DeviceContext->UserMax; i++) {
++        if (DeviceContext->UserInterrupt[i]) {
++            WdfObjectDelete(DeviceContext->UserInterrupt[i]);
++            DeviceContext->UserInterrupt[i] = NULL;
++        }
++    }
++
++    DeviceContext->MsixEnabled = FALSE;
++    DeviceContext->MsiEnabled = FALSE;
++}
++
++NTSTATUS
++XdmaEvtDeviceReleaseHardware(
++    _In_ WDFDEVICE Device,
++    _In_ WDFCMRESLIST ResourcesTranslated
++    )
++{
++    PXDMA_DEVICE_CONTEXT deviceContext;
++    ULONG i;
++
++    UNREFERENCED_PARAMETER(ResourcesTranslated);
++    PAGED_CODE();
++
++    deviceContext = XdmaGetDeviceContext(Device);
++
++    // Clean up engines first
++    for (i = 0; i < deviceContext->H2CChannelMax; i++) {
++        if (deviceContext->H2CEngines[i]) {
++            XdmaEngineFreeResource(deviceContext->H2CEngines[i]);
++            ExFreePoolWithTag(deviceContext->H2CEngines[i], 'AMDX');
++            deviceContext->H2CEngines[i] = NULL;
++        }
++    }
++    for (i = 0; i < deviceContext->C2HChannelMax; i++) {
++        if (deviceContext->C2HEngines[i]) {
++            XdmaEngineFreeResource(deviceContext->C2HEngines[i]);
++            ExFreePoolWithTag(deviceContext->C2HEngines[i], 'AMDX');
++            deviceContext->C2HEngines[i] = NULL;
++        }
++    }
++
++    // Clean up interrupts
++    XdmaCleanupInterrupts(deviceContext);
++
++    // Unmap all BAR regions
++    for (i = 0; i < XDMA_BAR_NUM; i++) {
++        if (deviceContext->BarBaseVA[i]) {
++            MmUnmapIoSpace(deviceContext->BarBaseVA[i],
++                          deviceContext->BarLength[i]);
++            deviceContext->BarBaseVA[i] = NULL;
++            deviceContext->BarBasePA[i].QuadPart = 0;
++            deviceContext->BarLength[i] = 0;
++        }
++    }
++
++    // Reset BAR indices
++    deviceContext->config_bar_idx = -1;
++    deviceContext->user_bar_idx = -1;
++    deviceContext->bypass_bar_idx = -1;
++
++    return STATUS_SUCCESS;
++}
++
++NTSTATUS
++XdmaEvtDeviceD0Entry(
++    _In_ WDFDEVICE Device,
++    _In_ WDF_POWER_DEVICE_STATE PreviousState
++    )
++{
++    PAGED_CODE();
++    return STATUS_SUCCESS;
++}
++
++NTSTATUS
++XdmaEvtDeviceD0Exit(
++    _In_ WDFDEVICE Device,
++    _In_ WDF_POWER_DEVICE_STATE TargetState
++    )
++{
++    PAGED_CODE();
++    return STATUS_SUCCESS;
++}
++
++// Forward declaration of IOCTL handler from IoControl.c
++VOID
++XdmaIoDeviceControl(
++    _In_ WDFQUEUE Queue,
++    _In_ WDFREQUEST Request,
++    _In_ size_t OutputBufferLength,
++    _In_ size_t InputBufferLength,
++    _In_ ULONG IoControlCode
++    );
++
++VOID
++XdmaEvtIoDeviceControl(
++    _In_ WDFQUEUE Queue,
++    _In_ WDFREQUEST Request,
++    _In_ size_t OutputBufferLength,
++    _In_ size_t InputBufferLength,
++    _In_ ULONG IoControlCode
++    )
++{
++    // Forward the IOCTL request to our comprehensive handler
++    XdmaIoDeviceControl(Queue, Request, OutputBufferLength, InputBufferLength, IoControlCode);
++}
+diff --git a/XDMA/win-kmdf/src/Device.h b/XDMA/win-kmdf/src/Device.h
+new file mode 100644
+index 0000000..3cb737e
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Device.h
+@@ -0,0 +1,142 @@
++/*++
++Module Name:
++    Device.h
++
++Abstract:
++    Header file for the XDMA device implementation
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++
++// Type definitions to match Linux driver
++typedef ULONG u32;
++
++// Constants from Linux driver
++#define MAX_USER_IRQ          16
++#define XDMA_CHANNEL_NUM_MAX  4
++#define XDMA_BAR_NUM         6
++
++// PCI Vendor and Device IDs (from Linux driver's pci_ids[])
++#define XILINX_VENDOR_ID     0x10EE
++#define XILINX_DEVICE_ID_1   0x9048
++#define XILINX_DEVICE_ID_2   0x9044
++#define AWS_VENDOR_ID        0x1D0F
++#define XDMA_BAR_SIZE        (1 << 17)  // 128KB minimum
++
++// Block IDs from Linux driver
++#define IRQ_BLOCK_ID         0x1FC0U
++#define CONFIG_BLOCK_ID      0x1000U
++
++// Register offsets
++#define XDMA_OFS_INT_CTRL    0x2000
++#define XDMA_OFS_CONFIG      0x3000
++
++// Register structures (matching Linux driver)
++struct interrupt_regs {
++    u32 identifier;
++    u32 user_int_enable;
++    u32 user_int_enable_w1s;
++    u32 user_int_enable_w1c;
++    u32 channel_int_enable;
++    u32 channel_int_enable_w1s;
++    u32 channel_int_enable_w1c;
++    u32 reserved_1[9];
++    u32 user_int_request;
++    u32 channel_int_request;
++    u32 user_int_pending;
++    u32 channel_int_pending;
++    u32 reserved_2[12];
++};
++
++struct config_regs {
++    u32 identifier;
++    u32 reserved[4095];
++};
++
++// Forward declarations
++EVT_WDF_INTERRUPT_ISR XdmaEvtInterruptIsr;
++EVT_WDF_INTERRUPT_DPC XdmaEvtInterruptDpc;
++EVT_WDF_INTERRUPT_ENABLE XdmaEvtInterruptEnable;
++EVT_WDF_INTERRUPT_DISABLE XdmaEvtInterruptDisable;
++
++// Interrupt context structure
++typedef struct _XDMA_INTERRUPT_CONTEXT {
++    PXDMA_DEVICE_CONTEXT DeviceContext;
++    ULONG Vector;                // MSI-X vector number
++    ULONG ChannelId;            // Channel ID for channel-specific interrupts
++    BOOLEAN IsUserInterrupt;     // TRUE for user interrupts, FALSE for channel interrupts
++} XDMA_INTERRUPT_CONTEXT, *PXDMA_INTERRUPT_CONTEXT;
++
++WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_INTERRUPT_CONTEXT, XdmaGetInterruptContext)
++
++// Device context structure (maps to xdma_pci_dev in Linux driver)
++typedef struct _XDMA_DEVICE_CONTEXT
++{
++    WDFDEVICE       WdfDevice;
++    WDFINTERRUPT    ChannelInterrupt[XDMA_CHANNEL_NUM_MAX * 2]; // H2C + C2H
++    WDFINTERRUPT    UserInterrupt[MAX_USER_IRQ];
++    WDFDMAENABLER   DmaEnabler;
++    
++    // PCIe resources
++    PHYSICAL_ADDRESS BarBasePA[XDMA_BAR_NUM];
++    PVOID           BarBaseVA[XDMA_BAR_NUM];
++    SIZE_T          BarLength[XDMA_BAR_NUM];
++    
++    // Device configuration (matches Linux driver)
++    ULONG           UserMax;
++    ULONG           H2CChannelMax;
++    ULONG           C2HChannelMax;
++    
++    // Bar indices (matches Linux driver)
++    INT             UserBarIdx;
++    INT             ConfigBarIdx;
++    INT             BypassBarIdx;
++
++    // Interrupt state
++    BOOLEAN         MsixEnabled;
++    BOOLEAN         MsiEnabled;
++    
++} XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
++
++WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_DEVICE_CONTEXT, XdmaGetDeviceContext)
++
++// Device event handlers
++EVT_WDF_DEVICE_CONTEXT_CLEANUP XdmaEvtDeviceContextCleanup;
++EVT_WDF_DEVICE_PREPARE_HARDWARE XdmaEvtDevicePrepareHardware;
++EVT_WDF_DEVICE_RELEASE_HARDWARE XdmaEvtDeviceReleaseHardware;
++EVT_WDF_DEVICE_D0_ENTRY XdmaEvtDeviceD0Entry;
++EVT_WDF_DEVICE_D0_EXIT XdmaEvtDeviceD0Exit;
++EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL XdmaEvtIoDeviceControl;
++
++WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_DEVICE_CONTEXT, XdmaGetDeviceContext)
++
++// Device event handlers
++EVT_WDF_DEVICE_PREPARE_HARDWARE XdmaEvtDevicePrepareHardware;
++EVT_WDF_DEVICE_RELEASE_HARDWARE XdmaEvtDeviceReleaseHardware;
++EVT_WDF_DEVICE_D0_ENTRY XdmaEvtDeviceD0Entry;
++EVT_WDF_DEVICE_D0_EXIT XdmaEvtDeviceD0Exit;
++EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL XdmaEvtIoDeviceControl;
++
++// Device context fields for IOCTL handling
++    USHORT VendorId;
++    USHORT DeviceId;
++    USHORT SubsystemVendorId;
++    USHORT SubsystemId;
++    ULONG DmaEngineVersion;
++    ULONG64 FeatureId;
++    USHORT Domain;
++    UCHAR Bus;
++    UCHAR Dev;
++    UCHAR Func;
++
++    // DMA engine arrays
++    PXDMA_ENGINE H2CEngines[XDMA_CHANNEL_NUM_MAX];
++    PXDMA_ENGINE C2HEngines[XDMA_CHANNEL_NUM_MAX];
++    
++    // Engine configuration
++    ULONG EnginesNum;
++    ULONG H2CChannelMax;
++    ULONG C2HChannelMax;
++    ULONG MaskIrqH2C;
++    ULONG MaskIrqC2H;
+diff --git a/XDMA/win-kmdf/src/DmaOperations.c b/XDMA/win-kmdf/src/DmaOperations.c
+new file mode 100644
+index 0000000..6c43f83
+--- /dev/null
++++ b/XDMA/win-kmdf/src/DmaOperations.c
+@@ -0,0 +1,563 @@
++/*++
++Module Name:
++    DmaOperations.c
++
++Abstract:
++    Implementation of DMA operations for XDMA Windows driver
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "Device.h"
++#include "DmaStructures.h"
++#include "DmaOperations.h"
++
++// Forward declarations
++static VOID XdmaSetupDescriptor(
++    _In_ PXDMA_DESC Descriptor,
++    _In_ PHYSICAL_ADDRESS SrcAddr,
++    _In_ PHYSICAL_ADDRESS DstAddr,
++    _In_ ULONG Length,
++    _In_ PHYSICAL_ADDRESS NextAddr,
++    _In_ BOOLEAN IsLast
++    );
++
++NTSTATUS
++XdmaTransactionConfigure(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ WDFDEVICE Device,
++    _In_ PVOID Context,
++    _In_ WDF_DMA_DIRECTION Direction,
++    _In_ PSCATTER_GATHER_LIST SgList
++    )
++{
++    PXDMA_TRANSFER transfer = (PXDMA_TRANSFER)Context;
++    PXDMA_ENGINE engine = transfer->Engine;
++    ULONG i;
++    PHYSICAL_ADDRESS nextAddr;
++    PHYSICAL_ADDRESS zeroAddr;
++    BOOLEAN isH2C = (Direction == WdfDmaDirectionWriteToDevice);
++
++    UNREFERENCED_PARAMETER(Transaction);
++    UNREFERENCED_PARAMETER(Device);
++
++    zeroAddr.QuadPart = 0;
++
++    // Validate transfer parameters
++    if (transfer->Offset >= engine->DeviceSize) {
++        DbgPrint("XdmaTransactionConfigure: Invalid device offset 0x%llx\n",
++                 transfer->Offset);
++        return STATUS_INVALID_PARAMETER;
++    }
++
++    // Set up descriptors for each SG element
++    for (i = 0; i < SgList->NumberOfElements; i++) {
++        PHYSICAL_ADDRESS srcAddr, dstAddr;
++        ULONG64 deviceOffset = transfer->Offset + transfer->BytesTransferred;
++        
++        // Validate device offset
++        if (deviceOffset >= engine->DeviceSize) {
++            DbgPrint("XdmaTransactionConfigure: Transfer exceeds device size\n");
++            return STATUS_INVALID_PARAMETER;
++        }
++        
++        if (isH2C) {
++            srcAddr = SgList->Elements[i].Address;
++            dstAddr.QuadPart = engine->DeviceAddress + deviceOffset;
++        } else {
++            srcAddr.QuadPart = engine->DeviceAddress + deviceOffset;
++            dstAddr = SgList->Elements[i].Address;
++        }
++        
++        // Update bytes transferred
++        transfer->BytesTransferred += SgList->Elements[i].Length;
++
++        // Calculate next descriptor address
++        if (i < SgList->NumberOfElements - 1) {
++            nextAddr.QuadPart = transfer->DescriptorPhys.QuadPart + 
++                               ((i + 1) * sizeof(XDMA_DESC));
++        } else {
++            nextAddr = zeroAddr; // Last descriptor
++        }
++
++        status = XdmaSetupDescriptor(&transfer->DescriptorVirt[i],
++                                    srcAddr,
++                                    dstAddr,
++                                    SgList->Elements[i].Length,
++                                    nextAddr,
++                                    (i == SgList->NumberOfElements - 1));
++        if (!NT_SUCCESS(status)) {
++            DbgPrint("XdmaTransactionConfigure: Failed to setup descriptor %d\n", i);
++            return status;
++        }
++    }
++
++    return STATUS_SUCCESS;
++}
++
++BOOLEAN
++XdmaTransactionExecute(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context
++    )
++{
++    PXDMA_TRANSFER transfer = (PXDMA_TRANSFER)Context;
++    PXDMA_ENGINE engine = transfer->Engine;
++    NTSTATUS status;
++
++    UNREFERENCED_PARAMETER(Transaction);
++
++    // Enable interrupts
++    WRITE_REGISTER_ULONG((PULONG)&engine->Regs->interrupt_enable_mask,
++                        XDMA_CTRL_IE_DESC_STOPPED |
++                        XDMA_CTRL_IE_DESC_COMPLETED |
++                        XDMA_CTRL_IE_DESC_ALIGN_MISMATCH |
++                        XDMA_CTRL_IE_MAGIC_STOPPED |
++                        XDMA_CTRL_IE_IDLE_STOPPED |
++                        XDMA_CTRL_IE_READ_ERROR |
++                        XDMA_CTRL_IE_DESC_ERROR);
++
++    // Start the engine
++    WRITE_REGISTER_ULONG((PULONG)&engine->Regs->control,
++                        XDMA_CTRL_RUN_STOP |
++                        (engine->NonIncrementingAddr ? XDMA_CTRL_NON_INCR_ADDR : 0));
++
++    return TRUE;
++}
++
++VOID
++XdmaTransactionDmaTransferred(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context,
++    _In_ NTSTATUS Status
++    )
++{
++    PXDMA_TRANSFER transfer = (PXDMA_TRANSFER)Context;
++    
++    UNREFERENCED_PARAMETER(Transaction);
++
++    if (!NT_SUCCESS(Status)) {
++        DbgPrint("XdmaTransactionDmaTransferred: Transfer failed with status 0x%x\n",
++                 Status);
++        transfer->State = XFER_STATE_FAILED;
++    }
++}
++
++VOID
++XdmaTransactionDmaCompleted(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context,
++    _In_ NTSTATUS Status
++    )
++{
++    PXDMA_TRANSFER transfer = (PXDMA_TRANSFER)Context;
++    PXDMA_ENGINE engine = transfer->Engine;
++    
++    UNREFERENCED_PARAMETER(Transaction);
++
++    LARGE_INTEGER currentTime, elapsedTime;
++    KeQuerySystemTime(&currentTime);
++    elapsedTime.QuadPart = currentTime.QuadPart - transfer->StartTime.QuadPart;
++    
++    // Update performance metrics
++    transfer->TotalBytes += transfer->BytesTransferred;
++    transfer->TotalTime += (ULONG64)(elapsedTime.QuadPart / 10); // Convert to microseconds
++
++    if (!NT_SUCCESS(Status)) {
++        DbgPrint("XdmaTransactionDmaCompleted: Transfer failed with status 0x%x\n",
++                 Status);
++        transfer->State = XFER_STATE_FAILED;
++    } else {
++        transfer->State = XFER_STATE_COMPLETED;
++        
++        // Handle cyclic transfers
++        if (transfer->IsCyclic) {
++            // Reset transfer state for next iteration
++            transfer->BytesTransferred = 0;
++            transfer->State = XFER_STATE_NEW;
++            KeQuerySystemTime(&transfer->StartTime);
++            
++            // Notify callback if registered
++            if (transfer->CyclicCallback && transfer->CyclicCallbackFn) {
++                transfer->CyclicCallbackFn(transfer->CyclicContext,
++                                         transfer->TotalBytes,
++                                         Status);
++            }
++            
++            // Resubmit the transfer
++            Status = XdmaTransferSubmit(engine, transfer);
++            if (NT_SUCCESS(Status)) {
++                return; // Don't complete the transfer
++            }
++        }
++    }
++
++    // Complete the transfer (non-cyclic or failed cyclic)
++    XdmaTransferComplete(engine, transfer, Status);
++}
++
++NTSTATUS
++XdmaSetupDescriptor(
++    _In_ PXDMA_DESC Descriptor,
++    _In_ PHYSICAL_ADDRESS SrcAddr,
++    _In_ PHYSICAL_ADDRESS DstAddr,
++    _In_ ULONG Length,
++    _In_ PHYSICAL_ADDRESS NextAddr,
++    _In_ BOOLEAN IsLast
++    )
++{
++    // Validate parameters
++    if (Length == 0 || Length > XDMA_DESC_BLEN_MAX) {
++        DbgPrint("XdmaSetupDescriptor: Invalid length %d\n", Length);
++        return STATUS_INVALID_PARAMETER;
++    }
++
++    if (SrcAddr.QuadPart == 0 || DstAddr.QuadPart == 0) {
++        DbgPrint("XdmaSetupDescriptor: Invalid address src=0x%llx dst=0x%llx\n",
++                 SrcAddr.QuadPart, DstAddr.QuadPart);
++        return STATUS_INVALID_PARAMETER;
++    }
++
++    RtlZeroMemory(Descriptor, sizeof(XDMA_DESC));
++
++    // Set up descriptor fields
++    Descriptor->Control = IsLast ? XDMA_DESC_EOP : 0;
++    Descriptor->Bytes = Length;
++    Descriptor->SrcAddrLow = (ULONG)SrcAddr.LowPart;
++    Descriptor->SrcAddrHigh = (ULONG)SrcAddr.HighPart;
++    Descriptor->DstAddrLow = (ULONG)DstAddr.LowPart;
++    Descriptor->DstAddrHigh = (ULONG)DstAddr.HighPart;
++    Descriptor->NextLow = (ULONG)NextAddr.LowPart;
++    Descriptor->NextHigh = (ULONG)NextAddr.HighPart;
++
++    DbgPrint("XdmaSetupDescriptor: Created descriptor src=0x%llx dst=0x%llx len=%d%s\n",
++             SrcAddr.QuadPart, DstAddr.QuadPart, Length,
++             IsLast ? " (EOP)" : "");
++
++    return STATUS_SUCCESS;
++}
++
++#define XDMA_DMA_DESCRIPTOR_RING_SIZE 256
++
++NTSTATUS
++XdmaEngineCreate(
++    _In_ WDFDEVICE Device,
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ BOOLEAN IsH2C,
++    _In_ ULONG Channel,
++    _Out_ PXDMA_ENGINE *Engine
++    )
++{
++    NTSTATUS status;
++    WDF_OBJECT_ATTRIBUTES attributes;
++    PXDMA_ENGINE engine;
++    WDF_DMA_ENABLER_CONFIG dmaConfig;
++    size_t descriptorBufferSize;
++
++    // Allocate and initialize engine object
++    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, XDMA_ENGINE);
++    status = WdfObjectCreate(&attributes, (WDFOBJECT*)&engine);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Initialize engine fields
++    engine->DeviceContext = DeviceContext;
++    engine->IsH2C = IsH2C;
++    engine->Channel = Channel;
++    engine->Running = FALSE;
++
++    // Create spin lock for engine
++    WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
++    status = WdfSpinLockCreate(&attributes, &engine->Lock);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    // Initialize transfer queue
++    InitializeListHead(&engine->TransferQueue);
++
++    // Configure DMA enabler
++    WDF_DMA_ENABLER_CONFIG_INIT(&dmaConfig, WdfDmaProfileScatterGather64Duplex, 
++                               XDMA_DESC_BLEN_MAX);
++    dmaConfig.WdmDmaVersionOverride = 3;
++    
++    status = WdfDmaEnablerCreate(Device, &dmaConfig, WDF_NO_OBJECT_ATTRIBUTES,
++                                &engine->DmaEnabler);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    // Allocate descriptor ring buffer
++    descriptorBufferSize = sizeof(XDMA_DESC) * XDMA_DMA_DESCRIPTOR_RING_SIZE;
++    status = WdfCommonBufferCreate(engine->DmaEnabler, descriptorBufferSize,
++                                 WDF_NO_OBJECT_ATTRIBUTES, &engine->DescriptorBuffer);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    // Get virtual and physical addresses of descriptor buffer
++    engine->DescriptorRing = WdfCommonBufferGetAlignedVirtualAddress(engine->DescriptorBuffer);
++    engine->DescriptorRingSize = XDMA_DMA_DESCRIPTOR_RING_SIZE;
++    
++    // Map engine registers
++    if (IsH2C) {
++        engine->Regs = (struct engine_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
++                                            H2C_CHANNEL_OFFSET + Channel * CHANNEL_SPACING);
++        engine->SgdmaRegs = (struct engine_sgdma_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
++                                                       SGDMA_OFFSET_FROM_CHANNEL + 
++                                                       H2C_CHANNEL_OFFSET + 
++                                                       Channel * CHANNEL_SPACING);
++    } else {
++        engine->Regs = (struct engine_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
++                                            Channel * CHANNEL_SPACING);
++        engine->SgdmaRegs = (struct engine_sgdma_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
++                                                       SGDMA_OFFSET_FROM_CHANNEL + 
++                                                       Channel * CHANNEL_SPACING);
++    }
++
++    *Engine = engine;
++    return STATUS_SUCCESS;
++
++cleanup:
++    if (engine->DescriptorBuffer) {
++        WdfObjectDelete(engine->DescriptorBuffer);
++    }
++    if (engine->DmaEnabler) {
++        WdfObjectDelete(engine->DmaEnabler);
++    }
++    if (engine->Lock) {
++        WdfObjectDelete(engine->Lock);
++    }
++    WdfObjectDelete(engine);
++    return status;
++}
++
++VOID
++XdmaEngineDestroy(
++    _In_ PXDMA_ENGINE Engine
++    )
++{
++    // Stop the engine
++    WRITE_REGISTER_ULONG((PULONG)&Engine->Regs->control, 0);
++    
++    // Clean up all pending transfers
++    while (!IsListEmpty(&Engine->TransferQueue)) {
++        PLIST_ENTRY entry = RemoveHeadList(&Engine->TransferQueue);
++        PXDMA_TRANSFER transfer = CONTAINING_RECORD(entry, XDMA_TRANSFER, TransferList);
++        XdmaTransferDestroy(transfer);
++    }
++
++    // Delete engine objects
++    if (Engine->DescriptorBuffer) {
++        WdfObjectDelete(Engine->DescriptorBuffer);
++    }
++    if (Engine->DmaEnabler) {
++        WdfObjectDelete(Engine->DmaEnabler);
++    }
++    if (Engine->Lock) {
++        WdfObjectDelete(Engine->Lock);
++    }
++    WdfObjectDelete(Engine);
++}
++
++NTSTATUS
++XdmaTransferCreate(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ WDFMEMORY Memory,
++    _In_ size_t Length,
++    _In_ BOOLEAN WriteToDevice,
++    _In_ BOOLEAN IsCyclic,
++    _In_opt_ PFN_XDMA_CYCLIC_CALLBACK CyclicCallback,
++    _In_opt_ PVOID CyclicContext,
++    _Out_ PXDMA_TRANSFER *Transfer
++    )
++{
++    NTSTATUS status;
++    WDF_OBJECT_ATTRIBUTES attributes;
++    PXDMA_TRANSFER transfer;
++    WDF_DMA_TRANSACTION_CONFIG dmaConfig;
++    size_t descriptorSize;
++
++    // Allocate transfer object
++    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, XDMA_TRANSFER);
++    status = WdfObjectCreate(&attributes, (WDFOBJECT*)&transfer);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Initialize transfer
++    transfer->Length = Length;
++    transfer->State = XFER_STATE_NEW;
++    transfer->IsCyclic = IsCyclic;
++    transfer->CyclicCallback = (CyclicCallback != NULL);
++    transfer->CyclicCallbackFn = CyclicCallback;
++    transfer->CyclicContext = CyclicContext;
++    transfer->BytesTransferred = 0;
++    transfer->TotalBytes = 0;
++    transfer->TotalTime = 0;
++    KeQuerySystemTime(&transfer->StartTime);
++    InitializeListHead(&transfer->TransferList);
++
++    // Calculate number of descriptors needed
++    ULONG descriptorCount = (ULONG)((Length + XDMA_DESC_BLEN_MAX - 1) / XDMA_DESC_BLEN_MAX);
++    descriptorSize = sizeof(XDMA_DESC) * descriptorCount;
++
++    // Allocate descriptor buffer
++    status = WdfCommonBufferCreate(Engine->DmaEnabler, descriptorSize,
++                                 WDF_NO_OBJECT_ATTRIBUTES, &transfer->CommonBuffer);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    // Get virtual and physical addresses
++    transfer->CommonBufferVirt = WdfCommonBufferGetAlignedVirtualAddress(transfer->CommonBuffer);
++    transfer->CommonBufferPhys = WdfCommonBufferGetAlignedLogicalAddress(transfer->CommonBuffer);
++    transfer->DescriptorVirt = (PXDMA_DESC)transfer->CommonBufferVirt;
++    transfer->DescriptorPhys = transfer->CommonBufferPhys;
++    transfer->DescriptorCount = descriptorCount;
++
++    // Create DMA transaction
++    WDF_DMA_TRANSACTION_CONFIG_INIT(&dmaConfig, WdfDmaDirectionWriteToDevice);
++    status = WdfDmaTransactionCreate(Engine->DmaEnabler, WDF_NO_OBJECT_ATTRIBUTES,
++                                   &transfer->DmaTransaction);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    // Initialize DMA transaction
++    status = WdfDmaTransactionInitialize(transfer->DmaTransaction, 
++                                       XdmaTransactionExecute,
++                                       WriteToDevice ? WdfDmaDirectionWriteToDevice 
++                                                   : WdfDmaDirectionReadFromDevice,
++                                       Memory, 0, Length);
++    if (!NT_SUCCESS(status)) {
++        goto cleanup;
++    }
++
++    *Transfer = transfer;
++    return STATUS_SUCCESS;
++
++cleanup:
++    if (transfer->DmaTransaction) {
++        WdfObjectDelete(transfer->DmaTransaction);
++    }
++    if (transfer->CommonBuffer) {
++        WdfObjectDelete(transfer->CommonBuffer);
++    }
++    WdfObjectDelete(transfer);
++    return status;
++}
++
++VOID
++XdmaTransferDestroy(
++    _In_ PXDMA_TRANSFER Transfer
++    )
++{
++    // Stop cyclic transfers if active
++    if (Transfer->IsCyclic && Transfer->State != XFER_STATE_NEW) {
++        DbgPrint("XdmaTransferDestroy: Stopping cyclic transfer\n");
++        Transfer->State = XFER_STATE_ABORTED;
++        
++        // Notify callback of cleanup if registered
++        if (Transfer->CyclicCallback && Transfer->CyclicCallbackFn) {
++            Transfer->CyclicCallbackFn(Transfer->CyclicContext,
++                                     Transfer->TotalBytes,
++                                     STATUS_CANCELLED);
++        }
++    }
++
++    // Remove from transfer queue if still queued
++    if (!IsListEmpty(&Transfer->TransferList)) {
++        RemoveEntryList(&Transfer->TransferList);
++    }
++
++    // Clean up DMA resources
++    if (Transfer->DmaTransaction) {
++        WdfObjectDelete(Transfer->DmaTransaction);
++    }
++    if (Transfer->CommonBuffer) {
++        WdfObjectDelete(Transfer->CommonBuffer);
++    }
++    WdfObjectDelete(Transfer);
++}
++
++NTSTATUS
++XdmaTransferSubmit(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_TRANSFER Transfer
++    )
++{
++    NTSTATUS status;
++    WdfSpinLockAcquire(Engine->Lock);
++
++    // Add to transfer queue
++    InsertTailList(&Engine->TransferQueue, &Transfer->TransferList);
++    Transfer->State = XFER_STATE_SUBMITTED;
++
++    // Start DMA transaction
++    status = WdfDmaTransactionExecute(Transfer->DmaTransaction, Transfer);
++    if (!NT_SUCCESS(status)) {
++        DbgPrint("XdmaTransferSubmit: WdfDmaTransactionExecute failed with status 0x%x\n", status);
++        RemoveEntryList(&Transfer->TransferList);
++        Transfer->State = XFER_STATE_FAILED;
++        WdfSpinLockRelease(Engine->Lock);
++        return status;
++    }
++
++    // Ensure descriptor writes are visible to hardware
++    KeMemoryBarrier();
++
++    // Program the engine with first descriptor
++    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_lo, 
++                        (ULONG)Transfer->DescriptorPhys.LowPart);
++    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_hi, 
++                        (ULONG)Transfer->DescriptorPhys.HighPart);
++    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_adjacent,
++                        Transfer->DescriptorCount - 1);
++
++    // Ensure register writes complete before starting engine
++    KeMemoryBarrier();
++    READ_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_adjacent);
++
++    DbgPrint("XdmaTransferSubmit: Started transfer with %d descriptors at PA 0x%llx\n",
++             Transfer->DescriptorCount,
++             Transfer->DescriptorPhys.QuadPart);
++
++    // Start engine if not already running
++    if (!Engine->Running) {
++        WRITE_REGISTER_ULONG((PULONG)&Engine->Regs->control, XDMA_CTRL_RUN_STOP);
++        Engine->Running = TRUE;
++    }
++
++    WdfSpinLockRelease(Engine->Lock);
++    return STATUS_SUCCESS;
++}
++
++VOID
++XdmaTransferComplete(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_TRANSFER Transfer,
++    _In_ NTSTATUS Status
++    )
++{
++    WdfSpinLockAcquire(Engine->Lock);
++
++    // Update transfer state
++    Transfer->State = NT_SUCCESS(Status) ? XFER_STATE_COMPLETED : XFER_STATE_FAILED;
++
++    // Remove from transfer queue
++    RemoveEntryList(&Transfer->TransferList);
++
++    // Stop engine if no more transfers
++    if (IsListEmpty(&Engine->TransferQueue)) {
++        WRITE_REGISTER_ULONG((PULONG)&Engine->Regs->control, 0);
++        Engine->Running = FALSE;
++    }
++
++    WdfSpinLockRelease(Engine->Lock);
++
++    // Complete the DMA transaction
++    WdfDmaTransactionDmaCompleted(Transfer->DmaTransaction, Status);
++    WdfDmaTransactionRelease(Transfer->DmaTransaction);
++}
+diff --git a/XDMA/win-kmdf/src/DmaOperations.h b/XDMA/win-kmdf/src/DmaOperations.h
+new file mode 100644
+index 0000000..25af6f4
+--- /dev/null
++++ b/XDMA/win-kmdf/src/DmaOperations.h
+@@ -0,0 +1,72 @@
++/*++
++Module Name:
++    DmaOperations.h
++
++Abstract:
++    Header file for DMA operations
++--*/
++
++#ifndef __XDMA_DMA_OPERATIONS_H__
++#define __XDMA_DMA_OPERATIONS_H__
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "DmaStructures.h"
++
++EVT_WDF_DMA_TRANSACTION_CONFIGURE XdmaTransactionConfigure;
++EVT_WDF_DMA_TRANSACTION_EXECUTE XdmaTransactionExecute;
++EVT_WDF_DMA_TRANSACTION_DMA_TRANSFERRED XdmaTransactionDmaTransferred;
++EVT_WDF_DMA_TRANSACTION_DMA_COMPLETED XdmaTransactionDmaCompleted;
++
++NTSTATUS
++XdmaSetupDescriptor(
++    _In_ PXDMA_DESC Descriptor,
++    _In_ PHYSICAL_ADDRESS SrcAddr,
++    _In_ PHYSICAL_ADDRESS DstAddr,
++    _In_ ULONG Length,
++    _In_ PHYSICAL_ADDRESS NextAddr,
++    _In_ BOOLEAN IsLast
++    );
++
++NTSTATUS
++XdmaTransactionConfigure(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ WDFDEVICE Device,
++    _In_ PVOID Context,
++    _In_ WDF_DMA_DIRECTION Direction,
++    _In_ PSCATTER_GATHER_LIST SgList
++    );
++
++BOOLEAN
++XdmaTransactionExecute(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context
++    );
++
++VOID
++XdmaTransactionDmaTransferred(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context,
++    _In_ NTSTATUS Status
++    );
++
++VOID
++XdmaTransactionDmaCompleted(
++    _In_ WDFDMATRANSACTION Transaction,
++    _In_ PVOID Context,
++    _In_ NTSTATUS Status
++    );
++
++NTSTATUS
++XdmaTransferCreate(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ WDFMEMORY Memory,
++    _In_ size_t Length,
++    _In_ BOOLEAN WriteToDevice,
++    _In_ BOOLEAN IsCyclic,
++    _In_opt_ PFN_XDMA_CYCLIC_CALLBACK CyclicCallback,
++    _In_opt_ PVOID CyclicContext,
++    _Out_ PXDMA_TRANSFER *Transfer
++    );
++
++#endif // __XDMA_DMA_OPERATIONS_H__
+diff --git a/XDMA/win-kmdf/src/DmaStructures.h b/XDMA/win-kmdf/src/DmaStructures.h
+new file mode 100644
+index 0000000..230beaf
+--- /dev/null
++++ b/XDMA/win-kmdf/src/DmaStructures.h
+@@ -0,0 +1,201 @@
++/*++
++Module Name:
++    DmaStructures.h
++
++Abstract:
++    DMA structures for XDMA Windows driver
++    Maps Linux XDMA structures to Windows KMDF equivalents
++--*/
++
++#ifndef __XDMA_DMA_STRUCTURES_H__
++#define __XDMA_DMA_STRUCTURES_H__
++
++#include <ntddk.h>
++#include <wdf.h>
++
++// Cyclic transfer callback
++typedef VOID (*PFN_XDMA_CYCLIC_CALLBACK)(
++    _In_ PVOID Context,
++    _In_ ULONG64 BytesTransferred,
++    _In_ NTSTATUS Status
++    );
++
++// Maximum transfer size per descriptor
++#define XDMA_DESC_BLEN_BITS   28
++#define XDMA_DESC_BLEN_MAX    ((1 << (XDMA_DESC_BLEN_BITS)) - 1)
++
++// DMA descriptor control bits (from Linux driver)
++#define XDMA_DESC_STOPPED     (1UL << 0)
++#define XDMA_DESC_COMPLETED   (1UL << 1)
++#define XDMA_DESC_EOP         (1UL << 4)
++
++// DMA descriptor structure (matches Linux xdma_desc)
++typedef struct _XDMA_DESC {
++    ULONG Control;
++    ULONG Bytes;          // Transfer length in bytes
++    ULONG SrcAddrLow;     // Source address (low 32-bit)
++    ULONG SrcAddrHigh;    // Source address (high 32-bit)
++    ULONG DstAddrLow;     // Destination address (low 32-bit)
++    ULONG DstAddrHigh;    // Destination address (high 32-bit)
++    ULONG NextLow;        // Next descriptor address (low 32-bit)
++    ULONG NextHigh;       // Next descriptor address (high 32-bit)
++} XDMA_DESC, *PXDMA_DESC;
++
++// DMA transfer state (matches Linux transfer_state enum)
++typedef enum _XDMA_TRANSFER_STATE {
++    XFER_STATE_NEW = 0,
++    XFER_STATE_SUBMITTED,
++    XFER_STATE_COMPLETED,
++    XFER_STATE_FAILED,
++    XFER_STATE_ABORTED
++} XDMA_TRANSFER_STATE;
++
++// DMA transfer structure (maps to Linux xdma_transfer)
++typedef struct _XDMA_TRANSFER {
++    LIST_ENTRY TransferList;           // Queue of non-completed transfers
++    PXDMA_DESC DescriptorVirt;        // Virtual address of first descriptor
++    PHYSICAL_ADDRESS DescriptorPhys;   // Physical address of first descriptor
++    ULONG DescriptorCount;            // Number of descriptors in transfer
++    ULONG DescriptorCompleted;        // Completed descriptors
++    XDMA_TRANSFER_STATE State;        // State of the transfer
++    BOOLEAN IsCyclic;                 // Flag if transfer is cyclic
++    WDFDMATRANSACTION DmaTransaction; // Associated DMA transaction
++    WDFCOMMONBUFFER CommonBuffer;     // Common buffer for descriptors
++    PVOID CommonBufferVirt;           // Virtual address of common buffer
++    PHYSICAL_ADDRESS CommonBufferPhys; // Physical address of common buffer
++    size_t Length;                    // Total transfer length
++    PXDMA_ENGINE Engine;             // Parent engine
++    ULONG64 Offset;                  // Device memory offset
++    ULONG64 BytesTransferred;        // Number of bytes transferred
++    
++    // Performance monitoring
++    LARGE_INTEGER StartTime;         // Transfer start time
++    ULONG64 TotalBytes;             // Total bytes transferred
++    ULONG64 TotalTime;              // Total transfer time in microseconds
++    
++    // Cyclic transfer
++    BOOLEAN CyclicCallback;         // TRUE if cyclic callback is enabled
++    PVOID CyclicContext;           // Context for cyclic callback
++    PFN_XDMA_CYCLIC_CALLBACK CyclicCallbackFn; // Cyclic transfer callback
++} XDMA_TRANSFER, *PXDMA_TRANSFER;
++
++// Engine register definitions (from Linux driver)
++typedef struct _XDMA_ENGINE_REGS {
++    ULONG Identifier;
++    ULONG Control;
++    ULONG ControlW1S;
++    ULONG ControlW1C;
++    ULONG Status;
++    ULONG StatusRC;
++    ULONG CompletedDescCount;
++    ULONG AlignmentsRegs[5];
++    ULONG PollModeWbLo;
++    ULONG PollModeWbHi;
++    ULONG InterruptEnableMask;
++    ULONG InterruptEnableMaskW1S;
++    ULONG InterruptEnableMaskW1C;
++    ULONG Reserved_0x50[4];
++    ULONG PerformanceCtrl;
++    ULONG Reserved_0x64;
++    ULONG PerformanceCycHi;
++    ULONG PerformanceCycLo;
++    ULONG PerformanceDatHi;
++    ULONG PerformanceDatLo;
++    ULONG PerformancePndHi;
++    ULONG PerformancePndLo;
++} XDMA_ENGINE_REGS, *PXDMA_ENGINE_REGS;
++
++typedef struct _XDMA_ENGINE_SGDMA_REGS {
++    ULONG Identifier;
++    ULONG Reserved_0x04[3];
++    ULONG FirstDescLo;
++    ULONG FirstDescHi;
++    ULONG FirstDescAdj;
++    ULONG Reserved_0x1C;
++    ULONG CreditsModeEnable;
++} XDMA_ENGINE_SGDMA_REGS, *PXDMA_ENGINE_SGDMA_REGS;
++
++// DMA engine structure (maps to Linux xdma_engine)
++typedef struct _XDMA_ENGINE {
++    ULONG Magic;                    // Magic number for validation
++    struct _XDMA_DEVICE_CONTEXT *DeviceContext; // Parent device
++    WDFSPINLOCK Lock;              // Protects concurrent access
++    CHAR Name[32];                 // Name of this engine
++    
++    // Engine configuration
++    BOOLEAN IsH2C;                 // TRUE for H2C, FALSE for C2H
++    ULONG Channel;                 // Channel number
++    BOOLEAN Streaming;             // Streaming vs MM mode
++    BOOLEAN Running;               // Engine is running
++    
++    // Register access
++    PXDMA_ENGINE_REGS Regs;       // Control registers
++    PXDMA_ENGINE_SGDMA_REGS SgdmaRegs; // SGDMA registers
++    
++    // Interrupt handling
++    ULONG IrqBitmask;             // Interrupt bitmask
++    ULONG InterruptEnableMaskValue; // Current interrupt mask
++    
++    // DMA resources
++    ULONG DescMax;                // Maximum descriptors
++    PXDMA_DESC DescriptorRing;    // Ring buffer of descriptors
++    PHYSICAL_ADDRESS DescriptorRingPhys; // Physical address of ring
++    WDFCOMMONBUFFER DescriptorBuffer; // Common buffer for descriptors
++    LIST_ENTRY TransferQueue;      // Queue of pending transfers
++    
++    // Cyclic transfer support
++    PXDMA_RESULT CyclicResult;    // Cyclic result buffer
++    PHYSICAL_ADDRESS CyclicResultPhys; // Physical address of result buffer
++    WDFCOMMONBUFFER CyclicResultBuffer; // Common buffer for results
++    
++    // Performance monitoring
++    ULONG64 BytesProcessed;       // Total bytes processed
++    ULONG64 TotalTime;           // Total processing time
++    
++    // Bypass mode
++    ULONG BypassOffset;          // Bypass mode offset
++} XDMA_ENGINE, *PXDMA_ENGINE;
++
++// Function declarations
++NTSTATUS
++XdmaEngineCreate(
++    _In_ WDFDEVICE Device,
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ BOOLEAN IsH2C,
++    _In_ ULONG Channel,
++    _Out_ PXDMA_ENGINE *Engine
++    );
++
++VOID
++XdmaEngineDestroy(
++    _In_ PXDMA_ENGINE Engine
++    );
++
++NTSTATUS
++XdmaTransferCreate(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ WDFMEMORY Memory,
++    _In_ size_t Length,
++    _In_ BOOLEAN WriteToDevice,
++    _Out_ PXDMA_TRANSFER *Transfer
++    );
++
++VOID
++XdmaTransferDestroy(
++    _In_ PXDMA_TRANSFER Transfer
++    );
++
++NTSTATUS
++XdmaTransferSubmit(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_TRANSFER Transfer
++    );
++
++VOID
++XdmaTransferComplete(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_TRANSFER Transfer,
++    _In_ NTSTATUS Status
++    );
++
++#endif // __XDMA_DMA_STRUCTURES_H__
+diff --git a/XDMA/win-kmdf/src/Driver.c b/XDMA/win-kmdf/src/Driver.c
+new file mode 100644
+index 0000000..d3f6866
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Driver.c
+@@ -0,0 +1,161 @@
++/*++
++Module Name:
++    Driver.c
++
++Abstract:
++    KMDF driver implementation for Xilinx XDMA
++    Windows port of the Linux XDMA driver
++
++Environment:
++    Kernel-mode Driver Framework
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++#include <initguid.h>
++#include "Device.h"
++#include "Driver.h"
++#include "Public.h"
++#include "Trace.h"
++#include "version.h"
++
++// Driver version information (from version.h)
++#define XDMA_DRIVER_VERSION ((DRV_MOD_MAJOR << 16) | (DRV_MOD_MINOR << 8) | DRV_MOD_PATCHLEVEL)
++#define XDMA_DRIVER_VERSION_STRING "XDMA Driver Version " STR(DRV_MOD_MAJOR) "." STR(DRV_MOD_MINOR) "." STR(DRV_MOD_PATCHLEVEL)
++
++#ifdef ALLOC_PRAGMA
++#pragma alloc_text (INIT, DriverEntry)
++#pragma alloc_text (PAGE, XdmaEvtDriverDeviceAdd)
++#pragma alloc_text (PAGE, XdmaEvtDriverUnload)
++#endif
++
++// Xilinx PCIe device IDs (from Linux driver's pci_ids[])
++#define XILINX_VENDOR_ID 0x10EE
++#define AWS_VENDOR_ID    0x1D0F
++
++NTSTATUS
++DriverEntry(
++    _In_ PDRIVER_OBJECT  DriverObject,
++    _In_ PUNICODE_STRING RegistryPath
++    )
++{
++    WDF_DRIVER_CONFIG config;
++    NTSTATUS status;
++    WDF_OBJECT_ATTRIBUTES attributes;
++
++    // Initialize WPP Tracing
++    WPP_INIT_TRACING(DriverObject, RegistryPath);
++
++    DbgPrint(XDMA_DRIVER_VERSION_STRING "\n");
++
++    // Initialize driver config to control device add
++    WDF_DRIVER_CONFIG_INIT(&config, XdmaEvtDriverDeviceAdd);
++    
++    // Set PnP and power management callbacks
++    config.EvtDriverUnload = XdmaEvtDriverUnload;
++    config.DriverInitFlags |= WdfDriverInitNonPnpDriver;
++    config.DriverPoolTag = 'AMDX';
++
++    // Register a cleanup callback
++    WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
++    attributes.EvtCleanupCallback = XdmaEvtDriverContextCleanup;
++
++    // Create the driver object
++    status = WdfDriverCreate(DriverObject,
++                           RegistryPath,
++                           &attributes,
++                           &config,
++                           WDF_NO_HANDLE);
++
++    if (!NT_SUCCESS(status)) {
++        DbgPrint("WdfDriverCreate failed with status 0x%x\n", status);
++        WPP_CLEANUP(DriverObject);
++        return status;
++    }
++
++    return status;
++}
++
++NTSTATUS
++XdmaEvtDriverDeviceAdd(
++    _In_    WDFDRIVER       Driver,
++    _Inout_ PWDFDEVICE_INIT DeviceInit
++    )
++{
++    NTSTATUS status;
++    ULONG vendorId, deviceId;
++    WDF_PNPPOWER_EVENT_CALLBACKS pnpPowerCallbacks;
++
++    UNREFERENCED_PARAMETER(Driver);
++    PAGED_CODE();
++
++    // Get PCI device information
++    status = WdfFdoInitQueryProperty(DeviceInit,
++                                   DevicePropertyVendorID,
++                                   sizeof(ULONG),
++                                   &vendorId,
++                                   NULL);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    status = WdfFdoInitQueryProperty(DeviceInit,
++                                   DevicePropertyDeviceID,
++                                   sizeof(ULONG),
++                                   &deviceId,
++                                   NULL);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Check if this is a supported Xilinx or AWS device
++    if (vendorId != XILINX_VENDOR_ID && vendorId != AWS_VENDOR_ID) {
++        return STATUS_DEVICE_CONFIGURATION_ERROR;
++    }
++
++    // Initialize PnP/Power callbacks
++    WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnpPowerCallbacks);
++    WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnpPowerCallbacks);
++
++    // Create the device
++    status = XdmaCreateDevice(DeviceInit);
++    if (!NT_SUCCESS(status)) {
++        DbgPrint("XdmaCreateDevice failed with status 0x%x\n", status);
++        return status;
++    }
++
++    return status;
++}
++
++VOID
++XdmaEvtDriverContextCleanup(
++    _In_ WDFOBJECT DriverObject
++    )
++{
++    PAGED_CODE();
++
++    // Maps to xpdev_free in Linux driver
++    PXDMA_DEVICE_CONTEXT deviceContext = XdmaGetDeviceContext((WDFDEVICE)DriverObject);
++    
++    // Free device resources
++    if (deviceContext != NULL) {
++        // Unmap BARs
++        for (ULONG i = 0; i < XDMA_BAR_NUM; i++) {
++            if (deviceContext->BarBaseVA[i] != NULL) {
++                MmUnmapIoSpace(deviceContext->BarBaseVA[i],
++                              deviceContext->BarLength[i]);
++            }
++        }
++    }
++
++    WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)DriverObject));
++}
++
++VOID
++XdmaEvtDriverUnload(
++    _In_ WDFDRIVER Driver
++    )
++{
++    UNREFERENCED_PARAMETER(Driver);
++    PAGED_CODE();
++}
+diff --git a/XDMA/win-kmdf/src/Driver.h b/XDMA/win-kmdf/src/Driver.h
+new file mode 100644
+index 0000000..2ad09d5
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Driver.h
+@@ -0,0 +1,21 @@
++/*++
++Module Name:
++    Driver.h
++
++Abstract:
++    Header file for the KMDF driver for Xilinx XDMA
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++
++DRIVER_INITIALIZE DriverEntry;
++EVT_WDF_DRIVER_DEVICE_ADD XdmaEvtDriverDeviceAdd;
++EVT_WDF_OBJECT_CONTEXT_CLEANUP XdmaEvtDriverContextCleanup;
++EVT_WDF_DRIVER_UNLOAD XdmaEvtDriverUnload;
++
++// Driver-specific function declarations
++NTSTATUS
++XdmaCreateDevice(
++    _Inout_ PWDFDEVICE_INIT DeviceInit
++    );
+diff --git a/XDMA/win-kmdf/src/EngineInit.c b/XDMA/win-kmdf/src/EngineInit.c
+new file mode 100644
+index 0000000..cff6b1b
+--- /dev/null
++++ b/XDMA/win-kmdf/src/EngineInit.c
+@@ -0,0 +1,191 @@
++/*++
++Module Name:
++    EngineInit.c
++
++Abstract:
++    Implementation of XDMA engine initialization
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "EngineInit.h"
++#include "Device.h"
++#include "DmaStructures.h"
++
++NTSTATUS
++XdmaEngineInit(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ ULONG Offset,
++    _In_ BOOLEAN IsH2C,
++    _In_ ULONG Channel
++    )
++{
++    NTSTATUS status;
++    u32 val;
++
++    // Set magic number (from Linux driver)
++    Engine->Magic = MAGIC_ENGINE;
++    Engine->Channel = Channel;
++
++    // Set interrupt bitmask (similar to Linux driver)
++    Engine->IrqBitmask = (1 << XDMA_ENG_IRQ_NUM) - 1;
++    Engine->IrqBitmask <<= (DeviceContext->EnginesNum * XDMA_ENG_IRQ_NUM);
++    Engine->BypassOffset = DeviceContext->EnginesNum * BYPASS_MODE_SPACING;
++
++    // Parent device context
++    Engine->DeviceContext = DeviceContext;
++
++    // Register addresses (similar to Linux driver)
++    Engine->Regs = (PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + Offset;
++    Engine->SgdmaRegs = (PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + 
++                        Offset + SGDMA_OFFSET_FROM_CHANNEL;
++
++    // Check if streaming mode
++    val = READ_REGISTER_ULONG((PULONG)&Engine->Regs->Identifier);
++    if (val & 0x8000U) {
++        Engine->Streaming = TRUE;
++    }
++
++    // Set DMA direction
++    Engine->IsH2C = IsH2C;
++
++    // Set engine name
++    RtlStringCbPrintfA(Engine->Name, sizeof(Engine->Name), "%d-%s%d-%s",
++                      DeviceContext->Idx,
++                      IsH2C ? "H2C" : "C2H",
++                      Channel,
++                      Engine->Streaming ? "ST" : "MM");
++
++    // Set descriptor count based on mode
++    if (Engine->Streaming && !IsH2C) {
++        Engine->DescMax = XDMA_ENGINE_CREDIT_XFER_MAX_DESC;
++    } else {
++        Engine->DescMax = XDMA_ENGINE_XFER_MAX_DESC;
++    }
++
++    // Update device context interrupt masks
++    if (IsH2C) {
++        DeviceContext->MaskIrqH2C |= Engine->IrqBitmask;
++    } else {
++        DeviceContext->MaskIrqC2H |= Engine->IrqBitmask;
++    }
++    DeviceContext->EnginesNum++;
++
++    // Allocate resources
++    status = XdmaEngineAllocResource(Engine);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    // Initialize registers
++    status = XdmaEngineInitRegs(Engine);
++    if (!NT_SUCCESS(status)) {
++        XdmaEngineFreeResource(Engine);
++        return status;
++    }
++
++    return STATUS_SUCCESS;
++}
++
++NTSTATUS
++XdmaEngineAllocResource(
++    _In_ PXDMA_ENGINE Engine
++    )
++{
++    WDFCOMMONBUFFER commonBuffer;
++    PHYSICAL_ADDRESS physAddr;
++    NTSTATUS status;
++
++    // Allocate descriptor ring (similar to Linux dma_alloc_coherent)
++    status = WdfCommonBufferCreate(Engine->DeviceContext->DmaEnabler,
++                                 Engine->DescMax * sizeof(XDMA_DESC),
++                                 WDF_NO_OBJECT_ATTRIBUTES,
++                                 &commonBuffer);
++    if (!NT_SUCCESS(status)) {
++        return status;
++    }
++
++    Engine->DescriptorRing = WdfCommonBufferGetVirtualAddress(commonBuffer);
++    physAddr = WdfCommonBufferGetAlignedLogicalAddress(commonBuffer);
++    Engine->DescriptorRingPhysAddr = physAddr.QuadPart;
++    Engine->DescriptorBuffer = commonBuffer;
++
++    // For streaming C2H, allocate result buffer
++    if (Engine->Streaming && !Engine->IsH2C) {
++        status = WdfCommonBufferCreate(Engine->DeviceContext->DmaEnabler,
++                                     Engine->DescMax * sizeof(struct xdma_result),
++                                     WDF_NO_OBJECT_ATTRIBUTES,
++                                     &commonBuffer);
++        if (!NT_SUCCESS(status)) {
++            XdmaEngineFreeResource(Engine);
++            return status;
++        }
++
++        Engine->CyclicResult = WdfCommonBufferGetVirtualAddress(commonBuffer);
++        physAddr = WdfCommonBufferGetAlignedLogicalAddress(commonBuffer);
++        Engine->CyclicResultPhysAddr = physAddr.QuadPart;
++        Engine->CyclicResultBuffer = commonBuffer;
++    }
++
++    return STATUS_SUCCESS;
++}
++
++VOID
++XdmaEngineFreeResource(
++    _In_ PXDMA_ENGINE Engine
++    )
++{
++    // Free descriptor ring
++    if (Engine->DescriptorBuffer) {
++        WdfObjectDelete(Engine->DescriptorBuffer);
++        Engine->DescriptorBuffer = NULL;
++        Engine->DescriptorRing = NULL;
++    }
++
++    // Free cyclic result buffer
++    if (Engine->CyclicResultBuffer) {
++        WdfObjectDelete(Engine->CyclicResultBuffer);
++        Engine->CyclicResultBuffer = NULL;
++        Engine->CyclicResult = NULL;
++    }
++}
++
++NTSTATUS
++XdmaEngineInitRegs(
++    _In_ PXDMA_ENGINE Engine
++    )
++{
++    u32 val;
++
++    // Clear non-increment addressing mode
++    WRITE_REGISTER_ULONG((PULONG)&Engine->Regs->Control,
++                        XDMA_CTRL_NON_INCR_ADDR);
++
++    // Configure error interrupts
++    val = XDMA_CTRL_IE_DESC_ALIGN_MISMATCH |
++          XDMA_CTRL_IE_MAGIC_STOPPED |
++          XDMA_CTRL_IE_READ_ERROR |
++          XDMA_CTRL_IE_DESC_ERROR;
++
++    // Enable completion interrupts
++    val |= XDMA_CTRL_IE_DESC_STOPPED |
++           XDMA_CTRL_IE_DESC_COMPLETED;
++
++    // Apply engine configurations
++    WRITE_REGISTER_ULONG((PULONG)&Engine->Regs->InterruptEnableMask, val);
++    Engine->InterruptEnableMaskValue = val;
++
++    // Enable credit mode for AXI-ST C2H if configured
++    if (Engine->Streaming && !Engine->IsH2C) {
++        PXDMA_DEVICE_CONTEXT deviceContext = Engine->DeviceContext;
++        u32 creditVal = (0x1 << Engine->Channel) << 16;
++        struct sgdma_common_regs *commonRegs =
++            (struct sgdma_common_regs *)((PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] +
++                                       (0x6 * TARGET_SPACING));
++
++        WRITE_REGISTER_ULONG((PULONG)&commonRegs->CreditModeEnable, creditVal);
++    }
++
++    return STATUS_SUCCESS;
++}
+diff --git a/XDMA/win-kmdf/src/EngineInit.h b/XDMA/win-kmdf/src/EngineInit.h
+new file mode 100644
+index 0000000..15736a9
+--- /dev/null
++++ b/XDMA/win-kmdf/src/EngineInit.h
+@@ -0,0 +1,71 @@
++/*++
++Module Name:
++    EngineInit.h
++
++Abstract:
++    Header file for XDMA engine initialization
++--*/
++
++#ifndef __XDMA_ENGINE_INIT_H__
++#define __XDMA_ENGINE_INIT_H__
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "Device.h"
++#include "DmaStructures.h"
++
++// Engine control register bits (from Linux driver)
++#define XDMA_CTRL_RUN_STOP                       (1UL << 0)
++#define XDMA_CTRL_IE_DESC_STOPPED                (1UL << 1)
++#define XDMA_CTRL_IE_DESC_COMPLETED              (1UL << 2)
++#define XDMA_CTRL_IE_DESC_ALIGN_MISMATCH         (1UL << 3)
++#define XDMA_CTRL_IE_MAGIC_STOPPED               (1UL << 4)
++#define XDMA_CTRL_IE_INVALID_LEN                 (1UL << 5)
++#define XDMA_CTRL_IE_IDLE_STOPPED                (1UL << 6)
++#define XDMA_CTRL_IE_READ_ERROR                  (1UL << 7)
++#define XDMA_CTRL_IE_DESC_ERROR                  (1UL << 8)
++#define XDMA_CTRL_NON_INCR_ADDR                  (1UL << 25)
++
++#define XDMA_CTRL_IE_ALL_ERRS                    \
++        (XDMA_CTRL_IE_DESC_ALIGN_MISMATCH |     \
++         XDMA_CTRL_IE_MAGIC_STOPPED |           \
++         XDMA_CTRL_IE_INVALID_LEN |             \
++         XDMA_CTRL_IE_IDLE_STOPPED |            \
++         XDMA_CTRL_IE_READ_ERROR |              \
++         XDMA_CTRL_IE_DESC_ERROR)
++
++// Engine status register bits
++#define XDMA_STAT_BUSY                           (1UL << 0)
++#define XDMA_STAT_DESC_STOPPED                   (1UL << 1)
++#define XDMA_STAT_DESC_COMPLETED                 (1UL << 2)
++#define XDMA_STAT_ALIGN_MISMATCH                 (1UL << 3)
++#define XDMA_STAT_MAGIC_STOPPED                  (1UL << 4)
++#define XDMA_STAT_INVALID_LEN                    (1UL << 5)
++#define XDMA_STAT_IDLE_STOPPED                   (1UL << 6)
++
++// Function declarations
++NTSTATUS
++XdmaEngineInit(
++    _In_ PXDMA_ENGINE Engine,
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ ULONG Offset,
++    _In_ BOOLEAN IsH2C,
++    _In_ ULONG Channel
++    );
++
++NTSTATUS
++XdmaEngineAllocResource(
++    _In_ PXDMA_ENGINE Engine
++    );
++
++VOID
++XdmaEngineFreeResource(
++    _In_ PXDMA_ENGINE Engine
++    );
++
++NTSTATUS
++XdmaEngineInitRegs(
++    _In_ PXDMA_ENGINE Engine
++    );
++
++#endif // __XDMA_ENGINE_INIT_H__
+diff --git a/XDMA/win-kmdf/src/IoControl.c b/XDMA/win-kmdf/src/IoControl.c
+new file mode 100644
+index 0000000..f357395
+--- /dev/null
++++ b/XDMA/win-kmdf/src/IoControl.c
+@@ -0,0 +1,306 @@
++/*++
++Module Name:
++    IoControl.c
++
++Abstract:
++    IOCTL handler implementation for XDMA Windows driver
++--*/
++
++#include <ntddk.h>
++#include <wdf.h>
++#include "Device.h"
++#include "DmaStructures.h"
++#include "DmaOperations.h"
++#include "Public.h"
++
++VOID
++XdmaIoDeviceControl(
++    _In_ WDFQUEUE Queue,
++    _In_ WDFREQUEST Request,
++    _In_ size_t OutputBufferLength,
++    _In_ size_t InputBufferLength,
++    _In_ ULONG IoControlCode
++    )
++{
++    NTSTATUS status = STATUS_SUCCESS;
++    WDFDEVICE device = WdfIoQueueGetDevice(Queue);
++    PXDMA_DEVICE_CONTEXT deviceContext = XdmaGetDeviceContext(device);
++    PVOID inputBuffer = NULL;
++    PVOID outputBuffer = NULL;
++    size_t bytesReturned = 0;
++
++    // Get input and output buffers
++    if (InputBufferLength > 0) {
++        status = WdfRequestRetrieveInputBuffer(Request, sizeof(XDMA_IOC_BASE),
++                                             &inputBuffer, NULL);
++        if (!NT_SUCCESS(status)) {
++            goto exit;
++        }
++
++        // Validate magic number
++        PXDMA_IOC_BASE base = (PXDMA_IOC_BASE)inputBuffer;
++        if (base->Magic != XDMA_MAGIC) {
++            status = STATUS_INVALID_PARAMETER;
++            goto exit;
++        }
++    }
++
++    if (OutputBufferLength > 0) {
++        status = WdfRequestRetrieveOutputBuffer(Request, sizeof(XDMA_IOC_BASE),
++                                              &outputBuffer, NULL);
++        if (!NT_SUCCESS(status)) {
++            goto exit;
++        }
++    }
++
++    switch (IoControlCode) {
++    case IOCTL_XDMA_GET_VERSION:
++        {
++            if (OutputBufferLength < sizeof(XDMA_VERSION_INFO)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_VERSION_INFO versionInfo = (PXDMA_VERSION_INFO)outputBuffer;
++            versionInfo->Major = DRV_MOD_MAJOR;
++            versionInfo->Minor = DRV_MOD_MINOR;
++            versionInfo->Build = DRV_MOD_PATCHLEVEL;
++            bytesReturned = sizeof(XDMA_VERSION_INFO);
++        }
++        break;
++
++    case IOCTL_XDMA_IOCINFO:
++        {
++            if (OutputBufferLength < sizeof(XDMA_IOC_INFO)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_IOC_INFO info = (PXDMA_IOC_INFO)outputBuffer;
++            info->Vendor = deviceContext->VendorId;
++            info->Device = deviceContext->DeviceId;
++            info->SubsystemVendor = deviceContext->SubsystemVendorId;
++            info->SubsystemDevice = deviceContext->SubsystemId;
++            info->DmaEngineVersion = deviceContext->DmaEngineVersion;
++            info->DriverVersion = (DRV_MOD_MAJOR << 16) | (DRV_MOD_MINOR << 8) | DRV_MOD_PATCHLEVEL;
++            info->FeatureId = deviceContext->FeatureId;
++            info->Domain = deviceContext->Domain;
++            info->Bus = deviceContext->Bus;
++            info->Dev = deviceContext->Dev;
++            info->Func = deviceContext->Func;
++            bytesReturned = sizeof(XDMA_IOC_INFO);
++        }
++        break;
++
++    case IOCTL_XDMA_IOCOFFLINE:
++        {
++            // Stop all DMA engines
++            for (ULONG i = 0; i < deviceContext->H2CChannelMax; i++) {
++                if (deviceContext->H2CEngines[i]) {
++                    WRITE_REGISTER_ULONG((PULONG)&deviceContext->H2CEngines[i]->Regs->control, 0);
++                    deviceContext->H2CEngines[i]->Running = FALSE;
++                }
++            }
++            for (ULONG i = 0; i < deviceContext->C2HChannelMax; i++) {
++                if (deviceContext->C2HEngines[i]) {
++                    WRITE_REGISTER_ULONG((PULONG)&deviceContext->C2HEngines[i]->Regs->control, 0);
++                    deviceContext->C2HEngines[i]->Running = FALSE;
++                }
++            }
++        }
++        break;
++
++    case IOCTL_XDMA_IOCONLINE:
++        {
++            // Re-enable all DMA engines
++            for (ULONG i = 0; i < deviceContext->H2CChannelMax; i++) {
++                if (deviceContext->H2CEngines[i]) {
++                    WRITE_REGISTER_ULONG((PULONG)&deviceContext->H2CEngines[i]->Regs->control,
++                                       XDMA_CTRL_RUN_STOP);
++                    deviceContext->H2CEngines[i]->Running = TRUE;
++                }
++            }
++            for (ULONG i = 0; i < deviceContext->C2HChannelMax; i++) {
++                if (deviceContext->C2HEngines[i]) {
++                    WRITE_REGISTER_ULONG((PULONG)&deviceContext->C2HEngines[i]->Regs->control,
++                                       XDMA_CTRL_RUN_STOP);
++                    deviceContext->C2HEngines[i]->Running = TRUE;
++                }
++            }
++        }
++        break;
++
++    case IOCTL_XDMA_PERFORM_DMA:
++        {
++            if (InputBufferLength < sizeof(XDMA_DMA_TRANSFER)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_DMA_TRANSFER transfer = (PXDMA_DMA_TRANSFER)inputBuffer;
++            PXDMA_ENGINE engine;
++
++            // Validate parameters
++            if (transfer->Direction == 0) { // H2C
++                if (transfer->Channel >= deviceContext->H2CChannelMax) {
++                    status = STATUS_INVALID_PARAMETER;
++                    break;
++                }
++                engine = deviceContext->H2CEngines[transfer->Channel];
++            } else { // C2H
++                if (transfer->Channel >= deviceContext->C2HChannelMax) {
++                    status = STATUS_INVALID_PARAMETER;
++                    break;
++                }
++                engine = deviceContext->C2HEngines[transfer->Channel];
++            }
++
++            if (!engine) {
++                status = STATUS_DEVICE_NOT_READY;
++                break;
++            }
++
++            // Create and submit DMA transfer
++            WDFMEMORY memory;
++            status = WdfMemoryCreatePreallocated(WDF_NO_OBJECT_ATTRIBUTES,
++                                               (PVOID)transfer->LocalAddress,
++                                               transfer->Length,
++                                               &memory);
++            if (!NT_SUCCESS(status)) {
++                break;
++            }
++
++            PXDMA_TRANSFER xdmaTransfer;
++            status = XdmaTransferCreate(engine,
++                                      memory,
++                                      transfer->Length,
++                                      transfer->Direction == 0,
++                                      transfer->IsCyclic,
++                                      NULL, // No callback for now
++                                      NULL,
++                                      &xdmaTransfer);
++            if (!NT_SUCCESS(status)) {
++                WdfObjectDelete(memory);
++                break;
++            }
++
++            xdmaTransfer->Offset = transfer->RemoteAddress;
++            status = XdmaTransferSubmit(engine, xdmaTransfer);
++            if (!NT_SUCCESS(status)) {
++                XdmaTransferDestroy(xdmaTransfer);
++                WdfObjectDelete(memory);
++                break;
++            }
++        }
++        break;
++
++    case IOCTL_XDMA_ADDRMODE_GET:
++        {
++            if (OutputBufferLength < sizeof(XDMA_ADDRMODE)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_ADDRMODE addrMode = (PXDMA_ADDRMODE)outputBuffer;
++            PXDMA_ENGINE engine;
++
++            // Get engine based on channel
++            if (addrMode->Channel < deviceContext->H2CChannelMax) {
++                engine = deviceContext->H2CEngines[addrMode->Channel];
++            } else if (addrMode->Channel < deviceContext->C2HChannelMax) {
++                engine = deviceContext->C2HEngines[addrMode->Channel];
++            } else {
++                status = STATUS_INVALID_PARAMETER;
++                break;
++            }
++
++            if (!engine) {
++                status = STATUS_DEVICE_NOT_READY;
++                break;
++            }
++
++            addrMode->NonIncrementing = engine->NonIncrementingAddr;
++            bytesReturned = sizeof(XDMA_ADDRMODE);
++        }
++        break;
++
++    case IOCTL_XDMA_ADDRMODE_SET:
++        {
++            if (InputBufferLength < sizeof(XDMA_ADDRMODE)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_ADDRMODE addrMode = (PXDMA_ADDRMODE)inputBuffer;
++            PXDMA_ENGINE engine;
++
++            // Get engine based on channel
++            if (addrMode->Channel < deviceContext->H2CChannelMax) {
++                engine = deviceContext->H2CEngines[addrMode->Channel];
++            } else if (addrMode->Channel < deviceContext->C2HChannelMax) {
++                engine = deviceContext->C2HEngines[addrMode->Channel];
++            } else {
++                status = STATUS_INVALID_PARAMETER;
++                break;
++            }
++
++            if (!engine) {
++                status = STATUS_DEVICE_NOT_READY;
++                break;
++            }
++
++            engine->NonIncrementingAddr = addrMode->NonIncrementing;
++        }
++        break;
++
++    case IOCTL_XDMA_PERFORMANCE_MEASURE:
++        {
++            if (OutputBufferLength < sizeof(XDMA_PERF_DATA)) {
++                status = STATUS_BUFFER_TOO_SMALL;
++                break;
++            }
++
++            PXDMA_PERF_DATA perfData = (PXDMA_PERF_DATA)outputBuffer;
++            PXDMA_ENGINE engine;
++
++            // Get engine based on direction and channel
++            if (perfData->Direction == 0) { // H2C
++                if (perfData->Channel >= deviceContext->H2CChannelMax) {
++                    status = STATUS_INVALID_PARAMETER;
++                    break;
++                }
++                engine = deviceContext->H2CEngines[perfData->Channel];
++            } else { // C2H
++                if (perfData->Channel >= deviceContext->C2HChannelMax) {
++                    status = STATUS_INVALID_PARAMETER;
++                    break;
++                }
++                engine = deviceContext->C2HEngines[perfData->Channel];
++            }
++
++            if (!engine) {
++                status = STATUS_DEVICE_NOT_READY;
++                break;
++            }
++
++            // Calculate performance metrics
++            perfData->TotalBytes = engine->BytesProcessed;
++            perfData->TotalTime = engine->TotalTime;
++            if (perfData->TotalTime > 0) {
++                perfData->Throughput = (perfData->TotalBytes * 1000000ULL) / 
++                                     (perfData->TotalTime * 1024 * 1024); // MB/s
++            } else {
++                perfData->Throughput = 0;
++            }
++            bytesReturned = sizeof(XDMA_PERF_DATA);
++        }
++        break;
++
++    default:
++        status = STATUS_INVALID_DEVICE_REQUEST;
++        break;
++    }
++
++exit:
++    WdfRequestCompleteWithInformation(Request, status, bytesReturned);
++}
+diff --git a/XDMA/win-kmdf/src/Public.h b/XDMA/win-kmdf/src/Public.h
+new file mode 100644
+index 0000000..1a9ed7d
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Public.h
+@@ -0,0 +1,104 @@
++/*++
++Module Name:
++    Public.h
++
++Abstract:
++    Public interface definitions for the XDMA driver
++--*/
++
++#define XDMA_DEVICE_TYPE 0x8000
++
++// Device interface GUID
++// {D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}
++DEFINE_GUID(GUID_DEVINTERFACE_XDMA,
++    0xd5ac7068, 0xc701, 0x4aa9, 0xa7, 0xa5, 0x9c, 0xdc, 0x2c, 0x4d, 0xb7, 0xa4);
++
++// IOCTLs mapped from Linux driver
++#define IOCTL_XDMA_GET_VERSION \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_IOCINFO \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_IOCOFFLINE \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_IOCONLINE \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x803, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_PERFORM_DMA \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x804, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_APERTURE_REG \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x805, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_ADDRMODE_GET \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x806, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_ADDRMODE_SET \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x807, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++#define IOCTL_XDMA_PERFORMANCE_MEASURE \
++    CTL_CODE(XDMA_DEVICE_TYPE, 0x808, METHOD_BUFFERED, FILE_ANY_ACCESS)
++
++// Common structures shared between user mode and kernel mode
++#define XDMA_MAGIC 0xAD4B0000  // Magic number for IOCTLs
++
++typedef struct _XDMA_IOC_BASE {
++    ULONG Magic;      // Must be XDMA_MAGIC
++    ULONG Command;    // Command specific to the IOCTL
++} XDMA_IOC_BASE, *PXDMA_IOC_BASE;
++
++typedef struct _XDMA_VERSION_INFO {
++    ULONG Major;
++    ULONG Minor;
++    ULONG Build;
++} XDMA_VERSION_INFO, *PXDMA_VERSION_INFO;
++
++typedef struct _XDMA_IOC_INFO {
++    XDMA_IOC_BASE Base;
++    USHORT Vendor;
++    USHORT Device;
++    USHORT SubsystemVendor;
++    USHORT SubsystemDevice;
++    ULONG DmaEngineVersion;
++    ULONG DriverVersion;
++    ULONG64 FeatureId;
++    USHORT Domain;
++    UCHAR Bus;
++    UCHAR Dev;
++    UCHAR Func;
++} XDMA_IOC_INFO, *PXDMA_IOC_INFO;
++
++typedef struct _XDMA_DMA_TRANSFER {
++    XDMA_IOC_BASE Base;
++    ULONG Channel;
++    ULONG Direction;  // 0 = H2C, 1 = C2H
++    ULONG64 LocalAddress;
++    ULONG64 RemoteAddress;
++    ULONG Length;
++    ULONG Flags;
++    BOOLEAN IsCyclic;
++} XDMA_DMA_TRANSFER, *PXDMA_DMA_TRANSFER;
++
++typedef struct _XDMA_APERTURE_REG {
++    XDMA_IOC_BASE Base;
++    ULONG64 Offset;
++    ULONG Length;
++    ULONG Direction;  // 0 = H2C, 1 = C2H
++} XDMA_APERTURE_REG, *PXDMA_APERTURE_REG;
++
++typedef struct _XDMA_ADDRMODE {
++    XDMA_IOC_BASE Base;
++    ULONG Channel;
++    BOOLEAN NonIncrementing;
++} XDMA_ADDRMODE, *PXDMA_ADDRMODE;
++
++typedef struct _XDMA_PERF_DATA {
++    XDMA_IOC_BASE Base;
++    ULONG Channel;
++    ULONG Direction;
++    ULONG64 TotalBytes;
++    ULONG64 TotalTime;    // In microseconds
++    ULONG64 Throughput;   // In MB/s
++} XDMA_PERF_DATA, *PXDMA_PERF_DATA;
+diff --git a/XDMA/win-kmdf/src/Trace.h b/XDMA/win-kmdf/src/Trace.h
+new file mode 100644
+index 0000000..c970c34
+--- /dev/null
++++ b/XDMA/win-kmdf/src/Trace.h
+@@ -0,0 +1,22 @@
++/*++
++Module Name:
++    Trace.h
++
++Abstract:
++    Header file for the debug tracing
++--*/
++
++#define WPP_CONTROL_GUIDS \
++    WPP_DEFINE_CONTROL_GUID( \
++        XdmaTraceGuid, (D5AC7068,C701,4AA9,A7A5,9CDC2C4DB7A4), \
++        WPP_DEFINE_BIT(MYDRIVER_ALL_INFO) \
++        WPP_DEFINE_BIT(TRACE_DRIVER) \
++        WPP_DEFINE_BIT(TRACE_DEVICE) \
++        WPP_DEFINE_BIT(TRACE_DMA) \
++    )
++
++#define WPP_LEVEL_FLAGS_LOGGER(lvl,flags) \
++    WPP_LEVEL_LOGGER(flags)
++
++#define WPP_LEVEL_FLAGS_ENABLED(lvl, flags) \
++    (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
+diff --git a/XDMA/win-kmdf/src/version.h b/XDMA/win-kmdf/src/version.h
+new file mode 100644
+index 0000000..b955d71
+--- /dev/null
++++ b/XDMA/win-kmdf/src/version.h
+@@ -0,0 +1,26 @@
++/*++
++Module Name:
++    version.h
++
++Abstract:
++    Version information for the XDMA Windows driver
++    Matches the Linux driver version numbering
++--*/
++
++#ifndef __XDMA_VERSION_H__
++#define __XDMA_VERSION_H__
++
++// Version numbers from Linux driver
++#define DRV_MOD_MAJOR        2020
++#define DRV_MOD_MINOR        2
++#define DRV_MOD_PATCHLEVEL   3
++
++#define STR_HELPER(x) #x
++#define STR(x) STR_HELPER(x)
++
++#define DRV_MODULE_VERSION      \
++    STR(DRV_MOD_MAJOR) "." \
++    STR(DRV_MOD_MINOR) "." \
++    STR(DRV_MOD_PATCHLEVEL)
++
++#endif // __XDMA_VERSION_H__
+diff --git a/XDMA/win-kmdf/src/xdma.inf b/XDMA/win-kmdf/src/xdma.inf
+new file mode 100644
+index 0000000..f6fd640
+--- /dev/null
++++ b/XDMA/win-kmdf/src/xdma.inf
+@@ -0,0 +1,78 @@
++;
++; xdma.inf
++;
++
++[Version]
++Signature="$WINDOWS NT$"
++Class=System
++ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
++Provider=%ManufacturerName%
++CatalogFile=xdma.cat
++DriverVer=
++
++[DestinationDirs]
++DefaultDestDir = 12
++XDMA_Device_CoInstaller_CopyFiles = 11
++
++[SourceDisksNames]
++1 = %DiskName%,,,""
++
++[SourceDisksFiles]
++xdma.sys  = 1,,
++WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1
++
++;*****************************************
++; Install Section
++;*****************************************
++
++[Manufacturer]
++%ManufacturerName%=Standard,NT$ARCH$
++
++[Standard.NT$ARCH$]
++%XDMA.DeviceDesc%=XDMA_Device, PCI\VEN_10EE&DEV_9048
++%XDMA.DeviceDesc%=XDMA_Device, PCI\VEN_10EE&DEV_9044
++
++[XDMA_Device.NT]
++CopyFiles=Drivers_Dir
++
++[Drivers_Dir]
++xdma.sys
++
++;-------------- Service installation
++[XDMA_Device.NT.Services]
++AddService = XDMA,%SPSVCINST_ASSOCSERVICE%, XDMA_Service_Inst
++
++; -------------- XDMA driver install sections
++[XDMA_Service_Inst]
++DisplayName    = %XDMA.SVCDESC%
++ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
++StartType      = 3               ; SERVICE_DEMAND_START
++ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
++ServiceBinary  = %12%\xdma.sys
++
++;
++;--- XDMA_Device Coinstaller installation ------
++;
++
++[XDMA_Device.NT.CoInstallers]
++AddReg=XDMA_Device_CoInstaller_AddReg
++CopyFiles=XDMA_Device_CoInstaller_CopyFiles
++
++[XDMA_Device_CoInstaller_AddReg]
++HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
++
++[XDMA_Device_CoInstaller_CopyFiles]
++WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
++
++[XDMA_Device.NT.Wdf]
++KmdfService =  XDMA, XDMA_wdfsect
++
++[XDMA_wdfsect]
++KmdfLibraryVersion = $KMDFVERSION$
++
++[Strings]
++SPSVCINST_ASSOCSERVICE= 0x00000002
++ManufacturerName="Xilinx"
++DiskName = "XDMA Installation Disk"
++XDMA.DeviceDesc = "Xilinx XDMA"
++XDMA.SVCDESC = "Xilinx XDMA Service"
+diff --git a/XDMA/win-kmdf/src/xdma.vcxproj b/XDMA/win-kmdf/src/xdma.vcxproj
+new file mode 100644
+index 0000000..04b75bf
+--- /dev/null
++++ b/XDMA/win-kmdf/src/xdma.vcxproj
+@@ -0,0 +1,101 @@
++<?xml version="1.0" encoding="utf-8"?>
++<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++  <ItemGroup Label="ProjectConfigurations">
++    <ProjectConfiguration Include="Debug|x64">
++      <Configuration>Debug</Configuration>
++      <Platform>x64</Platform>
++    </ProjectConfiguration>
++    <ProjectConfiguration Include="Release|x64">
++      <Configuration>Release</Configuration>
++      <Platform>x64</Platform>
++    </ProjectConfiguration>
++  </ItemGroup>
++  <PropertyGroup Label="Globals">
++    <ProjectGuid>{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}</ProjectGuid>
++    <TemplateGuid>{1bc93793-694f-48fe-9372-81e2b05556fd}</TemplateGuid>
++    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
++    <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
++    <Configuration>Debug</Configuration>
++    <Platform Condition="'$(Platform)' == ''">x64</Platform>
++    <RootNamespace>xdma</RootNamespace>
++  </PropertyGroup>
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
++    <TargetVersion>Windows10</TargetVersion>
++    <UseDebugLibraries>true</UseDebugLibraries>
++    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
++    <ConfigurationType>Driver</ConfigurationType>
++    <DriverType>KMDF</DriverType>
++    <DriverTargetPlatform>Universal</DriverTargetPlatform>
++  </PropertyGroup>
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
++    <TargetVersion>Windows10</TargetVersion>
++    <UseDebugLibraries>false</UseDebugLibraries>
++    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
++    <ConfigurationType>Driver</ConfigurationType>
++    <DriverType>KMDF</DriverType>
++    <DriverTargetPlatform>Universal</DriverTargetPlatform>
++  </PropertyGroup>
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
++  <ImportGroup Label="ExtensionSettings">
++  </ImportGroup>
++  <ImportGroup Label="PropertySheets">
++    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
++  </ImportGroup>
++  <PropertyGroup Label="UserMacros" />
++  <PropertyGroup />
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
++  </PropertyGroup>
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
++  </PropertyGroup>
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <ClCompile>
++      <WppEnabled>true</WppEnabled>
++      <WppRecorderEnabled>true</WppRecorderEnabled>
++      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
++      <WppKernelMode>true</WppKernelMode>
++    </ClCompile>
++    <Link>
++      <AdditionalDependencies>%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfLdr.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfDriverEntry.lib</AdditionalDependencies>
++    </Link>
++  </ItemDefinitionGroup>
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <ClCompile>
++      <WppEnabled>true</WppEnabled>
++      <WppRecorderEnabled>true</WppRecorderEnabled>
++      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
++      <WppKernelMode>true</WppKernelMode>
++    </ClCompile>
++    <Link>
++      <AdditionalDependencies>%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfLdr.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfDriverEntry.lib</AdditionalDependencies>
++    </Link>
++  </ItemDefinitionGroup>
++  <ItemGroup>
++    <FilesToPackage Include="$(TargetPath)" />
++  </ItemGroup>
++  <ItemGroup>
++    <ClCompile Include="Driver.c" />
++    <ClCompile Include="Device.c" />
++    <ClCompile Include="DmaOperations.c" />
++    <ClCompile Include="EngineInit.c" />
++    <ClCompile Include="IoControl.c" />
++  </ItemGroup>
++  <ItemGroup>
++    <ClInclude Include="Driver.h" />
++    <ClInclude Include="Device.h" />
++    <ClInclude Include="Public.h" />
++    <ClInclude Include="Trace.h" />
++    <ClInclude Include="DmaOperations.h" />
++    <ClInclude Include="DmaStructures.h" />
++    <ClInclude Include="EngineInit.h" />
++    <ClInclude Include="version.h" />
++  </ItemGroup>
++  <ItemGroup>
++    <Inf Include="xdma.inf" />
++  </ItemGroup>
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
++  <ImportGroup Label="ExtensionTargets">
++  </ImportGroup>
++</Project>
+diff --git a/XDMA/win-kmdf/xdma_win.sln b/XDMA/win-kmdf/xdma_win.sln
+new file mode 100644
+index 0000000..b8c0056
+--- /dev/null
++++ b/XDMA/win-kmdf/xdma_win.sln
+@@ -0,0 +1,24 @@
++Microsoft Visual Studio Solution File, Format Version 12.00
++# Visual Studio Version 16
++VisualStudioVersion = 16.0.31911.196
++MinimumVisualStudioVersion = 10.0.40219.1
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xdma", "src\xdma.vcxproj", "{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}"
++EndProject
++Global
++	GlobalSection(SolutionConfigurationPlatforms) = preSolution
++		Debug|x64 = Debug|x64
++		Release|x64 = Release|x64
++	EndGlobalSection
++	GlobalSection(ProjectConfigurationPlatforms) = postSolution
++		{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}.Debug|x64.ActiveCfg = Debug|x64
++		{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}.Debug|x64.Build.0 = Debug|x64
++		{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}.Release|x64.ActiveCfg = Release|x64
++		{D5AC7068-C701-4AA9-A7A5-9CDC2C4DB7A4}.Release|x64.Build.0 = Release|x64
++	EndGlobalSection
++	GlobalSection(SolutionProperties) = preSolution
++		HideSolutionNode = FALSE
++	EndGlobalSection
++	GlobalSection(ExtensibilityGlobals) = postSolution
++		SolutionGuid = {F3A9BB74-D3C8-4AA9-A6B5-9E73FDEBA6A1}
++	EndGlobalSection
++EndGlobal
+-- 
+2.34.1
+
+
+From 31b65307ad486a1592fb785ebd80a63be8b1d2f0 Mon Sep 17 00:00:00 2001
+From: Devin AI <158243242+devin-ai-integration[bot]@users.noreply.github.com>
+Date: Wed, 8 Jan 2025 10:50:05 +0000
+Subject: [PATCH 2/2] Fix Windows KMDF driver compilation issues: - Add missing
+ MSI vector fields in interrupt_regs - Fix WPP tracing setup in Driver.c -
+ Remove duplicate declarations - Update header includes
+
+Co-Authored-By: Guan Wang <guan.wang.buaa@gmail.com>
+---
+ XDMA/win-kmdf/src/Device.c        |  18 ++--
+ XDMA/win-kmdf/src/Device.h        | 141 +++++++++++++++++++++++-------
+ XDMA/win-kmdf/src/DmaOperations.h |   7 ++
+ XDMA/win-kmdf/src/DmaStructures.h |   7 ++
+ XDMA/win-kmdf/src/Driver.c        |  13 +--
+ 5 files changed, 142 insertions(+), 44 deletions(-)
+
+diff --git a/XDMA/win-kmdf/src/Device.c b/XDMA/win-kmdf/src/Device.c
+index ec9e097..4f1b2cf 100644
+--- a/XDMA/win-kmdf/src/Device.c
++++ b/XDMA/win-kmdf/src/Device.c
+@@ -6,11 +6,11 @@ Abstract:
+     Implementation of device-specific functions for XDMA driver
+ --*/
+ 
+-#include <ntddk.h>
+-#include <wdf.h>
+ #include "Device.h"
+ #include "Public.h"
+ #include "Trace.h"
++#include <ntddk.h>
++#include <wdf.h>
+ 
+ #ifdef ALLOC_PRAGMA
+ #pragma alloc_text (PAGE, XdmaCreateDevice)
+@@ -31,9 +31,10 @@ XdmaCreateDevice(
+     NTSTATUS status;
+     ULONG vendorId, deviceId;
+ 
+-    // Get PCI device information
++    // Get PCI device information using DEVPKEY
+     status = WdfFdoInitQueryProperty(DeviceInit,
+-                                   DevicePropertyVendorID,
++                                   &DEVPKEY_Device_VendorID,
++                                   DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &vendorId,
+                                    NULL);
+@@ -42,7 +43,8 @@ XdmaCreateDevice(
+     }
+ 
+     status = WdfFdoInitQueryProperty(DeviceInit,
+-                                   DevicePropertyDeviceID,
++                                   &DEVPKEY_Device_DeviceID,
++                                   DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &deviceId,
+                                    NULL);
+@@ -279,7 +281,9 @@ XdmaCleanupPartialInterrupts(
+ static NTSTATUS
+ XdmaSetupMsixInterrupts(
+     _In_ WDFDEVICE Device,
+-    _In_ PXDMA_DEVICE_CONTEXT DeviceContext
++    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
++    _In_ WDFCMRESLIST ResourceList,
++    _In_ WDFCMRESLIST ResourceListTranslated
+     )
+ {
+     NTSTATUS status;
+@@ -458,7 +462,7 @@ XdmaEvtDevicePrepareHardware(
+     }
+ 
+     // Set up MSI-X interrupts
+-    status = XdmaSetupMsixInterrupts(Device, deviceContext);
++    status = XdmaSetupMsixInterrupts(Device, deviceContext, ResourceList, ResourceListTranslated);
+     if (!NT_SUCCESS(status)) {
+         DbgPrint("Failed to set up MSI-X interrupts: 0x%x\n", status);
+         goto cleanup;
+diff --git a/XDMA/win-kmdf/src/Device.h b/XDMA/win-kmdf/src/Device.h
+index 3cb737e..1083c8a 100644
+--- a/XDMA/win-kmdf/src/Device.h
++++ b/XDMA/win-kmdf/src/Device.h
+@@ -6,8 +6,88 @@ Abstract:
+     Header file for the XDMA device implementation
+ --*/
+ 
++#ifndef __XDMA_DEVICE_H__
++#define __XDMA_DEVICE_H__
++
+ #include <ntddk.h>
+ #include <wdf.h>
++#include <initguid.h>
++#include <devpkey.h>
++#include <sal.h>
++
++// Device type and method access for IOCTLs
++#define FILE_DEVICE_XDMA        0x8000
++#define XDMA_IOCTL_TYPE        FILE_DEVICE_XDMA
++#define XDMA_IOCTL_ACCESS      FILE_ANY_ACCESS
++
++// Device type for bus master operations
++#define FILE_DEVICE_BUS_MASTER  0x0000002A
++
++// Forward declarations
++typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
++typedef struct _XDMA_RESULT XDMA_RESULT, *PXDMA_RESULT;
++
++// Device context structure
++typedef struct _XDMA_DEVICE_CONTEXT {
++    WDFDEVICE       WdfDevice;
++    WDFINTERRUPT    ChannelInterrupt[XDMA_CHANNEL_NUM_MAX * 2]; // H2C + C2H
++    WDFINTERRUPT    UserInterrupt[MAX_USER_IRQ];
++    WDFDMAENABLER   DmaEnabler;
++    
++    // PCIe resources
++    PHYSICAL_ADDRESS BarBasePA[XDMA_BAR_NUM];
++    PVOID           BarBaseVA[XDMA_BAR_NUM];
++    SIZE_T          BarLength[XDMA_BAR_NUM];
++    
++    // Device configuration
++    ULONG           UserMax;
++    ULONG           H2CChannelMax;
++    ULONG           C2HChannelMax;
++    
++    // Bar indices
++    INT             UserBarIdx;
++    INT             ConfigBarIdx;
++    INT             BypassBarIdx;
++
++    // Interrupt state
++    BOOLEAN         MsixEnabled;
++    BOOLEAN         MsiEnabled;
++
++    // Device identification
++    USHORT          VendorId;
++    USHORT          DeviceId;
++    USHORT          SubsystemVendorId;
++    USHORT          SubsystemId;
++    ULONG           DmaEngineVersion;
++    ULONG64         FeatureId;
++    USHORT          Domain;
++    UCHAR           Bus;
++    UCHAR           Dev;
++    UCHAR           Func;
++
++    // DMA engine arrays
++    PXDMA_ENGINE    H2CEngines[XDMA_CHANNEL_NUM_MAX];
++    PXDMA_ENGINE    C2HEngines[XDMA_CHANNEL_NUM_MAX];
++    
++    // Engine configuration
++    ULONG           EnginesNum;
++    ULONG           MaskIrqH2C;
++    ULONG           MaskIrqC2H;
++} XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
++
++WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_DEVICE_CONTEXT, XdmaGetDeviceContext)
++
++// Interrupt context structure
++typedef struct _XDMA_INTERRUPT_CONTEXT {
++    PXDMA_DEVICE_CONTEXT DeviceContext;
++    ULONG Vector;                // MSI-X vector number
++    ULONG ChannelId;            // Channel ID for channel-specific interrupts
++    BOOLEAN IsUserInterrupt;     // TRUE for user interrupts, FALSE for channel interrupts
++} XDMA_INTERRUPT_CONTEXT, *PXDMA_INTERRUPT_CONTEXT;
++
++WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_INTERRUPT_CONTEXT, XdmaGetInterruptContext)
++
++#include "DmaStructures.h"
+ 
+ // Type definitions to match Linux driver
+ typedef ULONG u32;
+@@ -32,6 +112,10 @@ typedef ULONG u32;
+ #define XDMA_OFS_INT_CTRL    0x2000
+ #define XDMA_OFS_CONFIG      0x3000
+ 
++// Forward declarations
++typedef struct _XDMA_DEVICE_CONTEXT XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
++typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
++
+ // Register structures (matching Linux driver)
+ struct interrupt_regs {
+     u32 identifier;
+@@ -47,6 +131,8 @@ struct interrupt_regs {
+     u32 user_int_pending;
+     u32 channel_int_pending;
+     u32 reserved_2[12];
++    u32 user_msi_vector;     // MSI vector for user interrupts
++    u32 channel_msi_vector;  // MSI vector for channel interrupts
+ };
+ 
+ struct config_regs {
+@@ -54,7 +140,7 @@ struct config_regs {
+     u32 reserved[4095];
+ };
+ 
+-// Forward declarations
++// Forward declarations for event callbacks
+ EVT_WDF_INTERRUPT_ISR XdmaEvtInterruptIsr;
+ EVT_WDF_INTERRUPT_DPC XdmaEvtInterruptDpc;
+ EVT_WDF_INTERRUPT_ENABLE XdmaEvtInterruptEnable;
+@@ -96,6 +182,27 @@ typedef struct _XDMA_DEVICE_CONTEXT
+     // Interrupt state
+     BOOLEAN         MsixEnabled;
+     BOOLEAN         MsiEnabled;
++
++    // Device identification
++    USHORT          VendorId;
++    USHORT          DeviceId;
++    USHORT          SubsystemVendorId;
++    USHORT          SubsystemId;
++    ULONG           DmaEngineVersion;
++    ULONG64         FeatureId;
++    USHORT          Domain;
++    UCHAR           Bus;
++    UCHAR           Dev;
++    UCHAR           Func;
++
++    // DMA engine arrays
++    PXDMA_ENGINE    H2CEngines[XDMA_CHANNEL_NUM_MAX];
++    PXDMA_ENGINE    C2HEngines[XDMA_CHANNEL_NUM_MAX];
++    
++    // Engine configuration
++    ULONG           EnginesNum;
++    ULONG           MaskIrqH2C;
++    ULONG           MaskIrqC2H;
+     
+ } XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
+ 
+@@ -109,34 +216,4 @@ EVT_WDF_DEVICE_D0_ENTRY XdmaEvtDeviceD0Entry;
+ EVT_WDF_DEVICE_D0_EXIT XdmaEvtDeviceD0Exit;
+ EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL XdmaEvtIoDeviceControl;
+ 
+-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_DEVICE_CONTEXT, XdmaGetDeviceContext)
+-
+-// Device event handlers
+-EVT_WDF_DEVICE_PREPARE_HARDWARE XdmaEvtDevicePrepareHardware;
+-EVT_WDF_DEVICE_RELEASE_HARDWARE XdmaEvtDeviceReleaseHardware;
+-EVT_WDF_DEVICE_D0_ENTRY XdmaEvtDeviceD0Entry;
+-EVT_WDF_DEVICE_D0_EXIT XdmaEvtDeviceD0Exit;
+-EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL XdmaEvtIoDeviceControl;
+-
+-// Device context fields for IOCTL handling
+-    USHORT VendorId;
+-    USHORT DeviceId;
+-    USHORT SubsystemVendorId;
+-    USHORT SubsystemId;
+-    ULONG DmaEngineVersion;
+-    ULONG64 FeatureId;
+-    USHORT Domain;
+-    UCHAR Bus;
+-    UCHAR Dev;
+-    UCHAR Func;
+-
+-    // DMA engine arrays
+-    PXDMA_ENGINE H2CEngines[XDMA_CHANNEL_NUM_MAX];
+-    PXDMA_ENGINE C2HEngines[XDMA_CHANNEL_NUM_MAX];
+-    
+-    // Engine configuration
+-    ULONG EnginesNum;
+-    ULONG H2CChannelMax;
+-    ULONG C2HChannelMax;
+-    ULONG MaskIrqH2C;
+-    ULONG MaskIrqC2H;
++#endif // __XDMA_DEVICE_H__
+diff --git a/XDMA/win-kmdf/src/DmaOperations.h b/XDMA/win-kmdf/src/DmaOperations.h
+index 25af6f4..b4193df 100644
+--- a/XDMA/win-kmdf/src/DmaOperations.h
++++ b/XDMA/win-kmdf/src/DmaOperations.h
+@@ -11,6 +11,13 @@ Abstract:
+ 
+ #include <ntddk.h>
+ #include <wdf.h>
++#include <sal.h>
++
++// Forward declarations
++typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
++typedef struct _XDMA_TRANSFER XDMA_TRANSFER, *PXDMA_TRANSFER;
++typedef struct _XDMA_DESC XDMA_DESC, *PXDMA_DESC;
++
+ #include "DmaStructures.h"
+ 
+ EVT_WDF_DMA_TRANSACTION_CONFIGURE XdmaTransactionConfigure;
+diff --git a/XDMA/win-kmdf/src/DmaStructures.h b/XDMA/win-kmdf/src/DmaStructures.h
+index 230beaf..8284f65 100644
+--- a/XDMA/win-kmdf/src/DmaStructures.h
++++ b/XDMA/win-kmdf/src/DmaStructures.h
+@@ -12,6 +12,13 @@ Abstract:
+ 
+ #include <ntddk.h>
+ #include <wdf.h>
++#include <sal.h>
++
++// Forward declarations
++typedef struct _XDMA_DEVICE_CONTEXT XDMA_DEVICE_CONTEXT, *PXDMA_DEVICE_CONTEXT;
++typedef struct _XDMA_ENGINE XDMA_ENGINE, *PXDMA_ENGINE;
++typedef struct _XDMA_TRANSFER XDMA_TRANSFER, *PXDMA_TRANSFER;
++typedef struct _XDMA_RESULT XDMA_RESULT, *PXDMA_RESULT;
+ 
+ // Cyclic transfer callback
+ typedef VOID (*PFN_XDMA_CYCLIC_CALLBACK)(
+diff --git a/XDMA/win-kmdf/src/Driver.c b/XDMA/win-kmdf/src/Driver.c
+index d3f6866..a3f1fe3 100644
+--- a/XDMA/win-kmdf/src/Driver.c
++++ b/XDMA/win-kmdf/src/Driver.c
+@@ -10,13 +10,14 @@ Environment:
+     Kernel-mode Driver Framework
+ --*/
+ 
++#include "Device.h"
++#include "Driver.h"
+ #include <ntddk.h>
+ #include <wdf.h>
+ #include <initguid.h>
+-#include "Device.h"
+-#include "Driver.h"
+ #include "Public.h"
+ #include "Trace.h"
++#include "Driver.tmh"  // Auto-generated WPP trace logging header
+ #include "version.h"
+ 
+ // Driver version information (from version.h)
+@@ -89,9 +90,10 @@ XdmaEvtDriverDeviceAdd(
+     UNREFERENCED_PARAMETER(Driver);
+     PAGED_CODE();
+ 
+-    // Get PCI device information
++    // Get PCI device information using DEVPKEY
+     status = WdfFdoInitQueryProperty(DeviceInit,
+-                                   DevicePropertyVendorID,
++                                   &DEVPKEY_Device_VendorID,
++                                   DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &vendorId,
+                                    NULL);
+@@ -100,7 +102,8 @@ XdmaEvtDriverDeviceAdd(
+     }
+ 
+     status = WdfFdoInitQueryProperty(DeviceInit,
+-                                   DevicePropertyDeviceID,
++                                   &DEVPKEY_Device_DeviceID,
++                                   DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &deviceId,
+                                    NULL);
+-- 
+2.34.1
+
