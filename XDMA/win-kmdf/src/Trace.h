@@ -27,16 +27,17 @@ Abstract:
     (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
 
 // Trace message format strings
-#define TRACE_LEVEL_ERROR        0
-#define TRACE_LEVEL_WARNING      1
-#define TRACE_LEVEL_INFORMATION  2
-#define TRACE_LEVEL_VERBOSE      3
+// XDMA-specific trace levels to avoid conflicts with Windows SDK
+#define XDMA_TRACE_LEVEL_ERROR        0
+#define XDMA_TRACE_LEVEL_WARNING      1
+#define XDMA_TRACE_LEVEL_INFORMATION  2
+#define XDMA_TRACE_LEVEL_VERBOSE      3
 
 // This comment block is scanned by the trace preprocessor to define our
 // Trace function.
 //
 // begin_wpp config
-// FUNC Trace{FLAG=MYDRIVER_ALL_INFO}(LEVEL, MSG, ...);
-// FUNC TraceEvents(LEVEL, FLAGS, MSG, ...);
+// FUNC XdmaTrace{FLAG=MYDRIVER_ALL_INFO}(LEVEL, MSG, ...);
+// FUNC XdmaTraceEvents(LEVEL, FLAGS, MSG, ...);
 // end_wpp
 //

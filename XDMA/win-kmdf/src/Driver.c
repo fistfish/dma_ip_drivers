@@ -22,7 +22,7 @@ Environment:
 #define WPP_CHECK_FOR_NULL_STRING  // to prevent exceptions due to NULL strings
 
 #if !defined(EVENT_TRACING)
-ULONG DebugLevel = TRACE_LEVEL_INFORMATION;
+ULONG DebugLevel = XDMA_TRACE_LEVEL_INFORMATION;
 ULONG DebugFlag = 0xff;
 #endif
 
