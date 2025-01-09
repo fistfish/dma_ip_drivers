@@ -13,8 +13,8 @@ Abstract:
 #include "DmaStructures.h"
 
 NTSTATUS
-XdmaEngineInit(
-    _In_ PXDMA_ENGINE Engine,
+XdmaEngineCreate(
+    _Out_ PXDMA_ENGINE* Engine,
     _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
     _In_ ULONG Offset,
     _In_ BOOLEAN IsH2C,
@@ -32,6 +32,9 @@ XdmaEngineInit(
     Engine->IrqBitmask = (1 << XDMA_ENG_IRQ_NUM) - 1;
     Engine->IrqBitmask <<= (DeviceContext->EnginesNum * XDMA_ENG_IRQ_NUM);
     Engine->BypassOffset = DeviceContext->EnginesNum * BYPASS_MODE_SPACING;
+
+    // Initialize engine status
+    Engine->Status = XDMA_ENGINE_INIT_SUCCESS;
 
     // Parent device context
     Engine->DeviceContext = DeviceContext;

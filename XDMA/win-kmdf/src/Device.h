@@ -140,26 +140,26 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(XDMA_INTERRUPT_CONTEXT, XdmaGetInterruptConte
 
 // Register structures (matching Linux driver)
 struct interrupt_regs {
-    u32 identifier;
-    u32 user_int_enable;
-    u32 user_int_enable_w1s;
-    u32 user_int_enable_w1c;
-    u32 channel_int_enable;
-    u32 channel_int_enable_w1s;
-    u32 channel_int_enable_w1c;
-    u32 reserved_1[9];
-    u32 user_int_request;
-    u32 channel_int_request;
-    u32 user_int_pending;
-    u32 channel_int_pending;
-    u32 reserved_2[12];
-    u32 user_msi_vector;     // MSI vector for user interrupts
-    u32 channel_msi_vector;  // MSI vector for channel interrupts
+    u32 Identifier;
+    u32 UserIntEnable;
+    u32 UserIntEnableW1s;
+    u32 UserIntEnableW1c;
+    u32 ChannelIntEnable;
+    u32 ChannelIntEnableW1s;
+    u32 ChannelIntEnableW1c;
+    u32 Reserved1[9];
+    u32 UserIntRequest;
+    u32 ChannelIntRequest;
+    u32 UserIntPending;
+    u32 ChannelIntPending;
+    u32 Reserved2[12];
+    u32 UserMsiVector;     // MSI vector for user interrupts
+    u32 ChannelMsiVector;  // MSI vector for channel interrupts
 };
 
 struct config_regs {
-    u32 identifier;
-    u32 reserved[4095];
+    u32 Identifier;
+    u32 Reserved[4095];
 };
 
 // Forward declarations for event callbacks
@@ -167,6 +167,15 @@ EVT_WDF_INTERRUPT_ISR XdmaEvtInterruptIsr;
 EVT_WDF_INTERRUPT_DPC XdmaEvtInterruptDpc;
 EVT_WDF_INTERRUPT_ENABLE XdmaEvtInterruptEnable;
 EVT_WDF_INTERRUPT_DISABLE XdmaEvtInterruptDisable;
+
+// Function declarations
+NTSTATUS
+XdmaEngineInit(
+    __in PXDMA_ENGINE Engine,
+    __in ULONG Offset,
+    __in BOOLEAN IsH2C,
+    __in ULONG Channel
+    );
 
 // Device event handlers
 EVT_WDF_DEVICE_CONTEXT_CLEANUP XdmaEvtDeviceContextCleanup;

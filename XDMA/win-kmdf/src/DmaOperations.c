@@ -108,9 +108,9 @@ XdmaTransactionConfigure(
         
         if (isH2C) {
             srcAddr = SgList->Elements[i].Address;
-            dstAddr.QuadPart = engine->DeviceAddress + deviceOffset;
+            dstAddr.QuadPart = engine->DeviceAddress.QuadPart + deviceOffset;
         } else {
-            srcAddr.QuadPart = engine->DeviceAddress + deviceOffset;
+            srcAddr.QuadPart = engine->DeviceAddress.QuadPart + deviceOffset;
             dstAddr = SgList->Elements[i].Address;
         }
         
@@ -347,17 +347,14 @@ XdmaEngineCreate(
     
     // Map engine registers
     if (IsH2C) {
-        engine->Regs = (struct engine_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
-                                            H2C_CHANNEL_OFFSET + Channel * CHANNEL_SPACING);
-        engine->SgdmaRegs = (struct engine_sgdma_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
-                                                       SGDMA_OFFSET_FROM_CHANNEL + 
-                                                       H2C_CHANNEL_OFFSET + 
-                                                       Channel * CHANNEL_SPACING);
+        PUCHAR baseAddr = (PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx];
+        engine->Regs = (struct engine_regs *)(baseAddr + H2C_CHANNEL_OFFSET + Channel * CHANNEL_SPACING);
+        engine->SgdmaRegs = (struct engine_sgdma_regs *)(baseAddr + SGDMA_OFFSET_FROM_CHANNEL + 
+                                                       H2C_CHANNEL_OFFSET + Channel * CHANNEL_SPACING);
     } else {
-        engine->Regs = (struct engine_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
-                                            Channel * CHANNEL_SPACING);
-        engine->SgdmaRegs = (struct engine_sgdma_regs *)(DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] +
-                                                       SGDMA_OFFSET_FROM_CHANNEL + 
+        PUCHAR baseAddr = (PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx];
+        engine->Regs = (struct engine_regs *)(baseAddr + Channel * CHANNEL_SPACING);
+        engine->SgdmaRegs = (struct engine_sgdma_regs *)(baseAddr + SGDMA_OFFSET_FROM_CHANNEL + 
                                                        Channel * CHANNEL_SPACING);
     }
 
@@ -554,12 +551,13 @@ XdmaTransferSubmit(
     KeMemoryBarrier();
 
     // Program the engine with first descriptor
-    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_lo, 
-                        (ULONG)Transfer->DescriptorPhys.LowPart);
-    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_hi, 
-                        (ULONG)Transfer->DescriptorPhys.HighPart);
-    WRITE_REGISTER_ULONG((PULONG)&Engine->SgdmaRegs->first_desc_adjacent,
-                        Transfer->DescriptorCount - 1);
+    volatile ULONG* firstDescLoReg = (volatile PULONG)&Engine->SgdmaRegs->FirstDescLo;
+    volatile ULONG* firstDescHiReg = (volatile PULONG)&Engine->SgdmaRegs->FirstDescHi;
+    volatile ULONG* firstDescAdjReg = (volatile PULONG)&Engine->SgdmaRegs->FirstDescAdj;
+    
+    WRITE_REGISTER_ULONG((PULONG)firstDescLoReg, (ULONG)Transfer->DescriptorPhys.LowPart);
+    WRITE_REGISTER_ULONG((PULONG)firstDescHiReg, (ULONG)Transfer->DescriptorPhys.HighPart);
+    WRITE_REGISTER_ULONG((PULONG)firstDescAdjReg, Transfer->DescriptorCount - 1);
 
     // Ensure register writes complete before starting engine
     KeMemoryBarrier();

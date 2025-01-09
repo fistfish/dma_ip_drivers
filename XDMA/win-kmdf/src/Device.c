@@ -31,24 +31,24 @@ XdmaCreateDevice(
     NTSTATUS status;
     ULONG vendorId, deviceId;
 
-    // Get PCI device information using DEVPKEY
+    // Get PCI device information using DeviceProperty
     DEVPROPTYPE propertyType;
-    status = WdfFdoInitQueryPropertyEx(DeviceInit,
-                                     &DEVPKEY_Device_VendorID,
-                                     sizeof(ULONG),
-                                     &vendorId,
-                                     &propertyType,
-                                     NULL);
+    status = WdfFdoInitQueryProperty(DeviceInit,
+                                    &DEVPKEY_Device_VendorID,
+                                    DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &vendorId,
+                                    NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }
 
-    status = WdfFdoInitQueryPropertyEx(DeviceInit,
-                                     &DEVPKEY_Device_DeviceID,
-                                     sizeof(ULONG),
-                                     &deviceId,
-                                     &propertyType,
-                                     NULL);
+    status = WdfFdoInitQueryProperty(DeviceInit,
+                                    &DEVPKEY_Device_DeviceID,
+                                    DEVPROP_TYPE_UINT32,
+                                    sizeof(ULONG),
+                                    &deviceId,
+                                    NULL);
     if (!NT_SUCCESS(status)) {
         return status;
     }
@@ -146,28 +146,29 @@ XdmaEvtInterruptIsr(
 
     if (interruptContext->IsUserInterrupt) {
         // Handle user interrupt (similar to xdma_user_irq)
-        struct interrupt_regs *int_regs = 
-            (struct interrupt_regs *)((PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
-                                    XDMA_OFS_INT_CTRL);
+        PUCHAR baseAddr = (PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx];
+        struct interrupt_regs *int_regs = (struct interrupt_regs *)((PUCHAR)baseAddr + (ULONG_PTR)XDMA_OFS_INT_CTRL);
         
         // Read and clear user interrupt status
-        u32 user_irq_status = READ_REGISTER_ULONG((volatile ULONG *)&int_regs->user_int_request);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->UserIntRequest;
+        u32 user_irq_status = READ_REGISTER_ULONG((PULONG)regAddr);
         if (user_irq_status) {
-            WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->user_int_request, user_irq_status);
+            volatile ULONG *clearAddr = (volatile PULONG)&int_regs->UserIntRequest;
+            WRITE_REGISTER_ULONG((PULONG)clearAddr, user_irq_status);
             WdfInterruptQueueDpcForIsr(Interrupt);
             handled = TRUE;
         }
     } else {
         // Handle channel interrupt (similar to xdma_channel_irq)
-        struct interrupt_regs *int_regs = 
-            (struct interrupt_regs *)((PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
-                                    XDMA_OFS_INT_CTRL);
+        PUCHAR baseAddr = (PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx];
+        struct interrupt_regs *int_regs = (struct interrupt_regs *)((PUCHAR)baseAddr + (ULONG_PTR)XDMA_OFS_INT_CTRL);
         
         // Read and clear channel interrupt status
-        u32 channel_status = READ_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_int_request);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->ChannelIntRequest;
+        u32 channel_status = READ_REGISTER_ULONG((PULONG)regAddr);
         if (channel_status & (1 << interruptContext->ChannelId)) {
-            WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_int_request, 
-                               1 << interruptContext->ChannelId);
+            volatile ULONG *clearAddr = (volatile PULONG)&int_regs->ChannelIntRequest;
+            WRITE_REGISTER_ULONG((PULONG)clearAddr, 1 << interruptContext->ChannelId);
             WdfInterruptQueueDpcForIsr(Interrupt);
             handled = TRUE;
         }
@@ -199,8 +200,8 @@ XdmaEvtInterruptDpc(
 
 NTSTATUS
 XdmaEvtInterruptEnable(
-    _In_ WDFINTERRUPT Interrupt,
-    _In_ WDFDEVICE AssociatedDevice
+    WDFINTERRUPT Interrupt,
+    WDFDEVICE AssociatedDevice
     )
 {
     UNREFERENCED_PARAMETER(AssociatedDevice);
@@ -209,17 +210,17 @@ XdmaEvtInterruptEnable(
     PXDMA_DEVICE_CONTEXT deviceContext = interruptContext->DeviceContext;
     struct interrupt_regs *int_regs;
 
-    int_regs = (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
-                                       XDMA_OFS_INT_CTRL);
+    PUCHAR baseAddr = (PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx];
+    int_regs = (struct interrupt_regs *)((PUCHAR)((ULONG_PTR)baseAddr + XDMA_OFS_INT_CTRL));
 
     if (interruptContext->IsUserInterrupt) {
         // Enable user interrupt
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_enable_w1s, 
-                            1 << interruptContext->ChannelId);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->UserIntEnableW1s;
+        WRITE_REGISTER_ULONG((PULONG)regAddr, 1 << interruptContext->ChannelId);
     } else {
         // Enable channel interrupt
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_enable_w1s,
-                            1 << interruptContext->ChannelId);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->ChannelIntEnableW1s;
+        WRITE_REGISTER_ULONG((PULONG)regAddr, 1 << interruptContext->ChannelId);
     }
 
     return STATUS_SUCCESS;
@@ -227,8 +228,8 @@ XdmaEvtInterruptEnable(
 
 NTSTATUS
 XdmaEvtInterruptDisable(
-    _In_ WDFINTERRUPT Interrupt,
-    _In_ WDFDEVICE AssociatedDevice
+    WDFINTERRUPT Interrupt,
+    WDFDEVICE AssociatedDevice
     )
 {
     UNREFERENCED_PARAMETER(AssociatedDevice);
@@ -237,17 +238,17 @@ XdmaEvtInterruptDisable(
     PXDMA_DEVICE_CONTEXT deviceContext = interruptContext->DeviceContext;
     struct interrupt_regs *int_regs;
 
-    int_regs = (struct interrupt_regs *)(deviceContext->BarBaseVA[deviceContext->ConfigBarIdx] + 
-                                       XDMA_OFS_INT_CTRL);
+    PUCHAR baseAddr = (PUCHAR)deviceContext->BarBaseVA[deviceContext->ConfigBarIdx];
+    int_regs = (struct interrupt_regs *)((PUCHAR)((ULONG_PTR)baseAddr + XDMA_OFS_INT_CTRL));
 
     if (interruptContext->IsUserInterrupt) {
         // Disable user interrupt
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->user_int_enable_w1c,
-                            1 << interruptContext->ChannelId);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->UserIntEnableW1c;
+        WRITE_REGISTER_ULONG((PULONG)regAddr, 1 << interruptContext->ChannelId);
     } else {
         // Disable channel interrupt
-        WRITE_REGISTER_ULONG((PULONG)&int_regs->channel_int_enable_w1c,
-                            1 << interruptContext->ChannelId);
+        volatile ULONG *regAddr = (volatile PULONG)&int_regs->ChannelIntEnableW1c;
+        WRITE_REGISTER_ULONG((PULONG)regAddr, 1 << interruptContext->ChannelId);
     }
 
     return STATUS_SUCCESS;
@@ -255,9 +256,9 @@ XdmaEvtInterruptDisable(
 
 static VOID
 XdmaCleanupPartialInterrupts(
-    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
-    _In_ ULONG ChannelCount,
-    _In_ ULONG UserCount
+    PXDMA_DEVICE_CONTEXT DeviceContext,
+    ULONG ChannelCount,
+    ULONG UserCount
     )
 {
     ULONG i;
@@ -281,10 +282,10 @@ XdmaCleanupPartialInterrupts(
 
 static NTSTATUS
 XdmaSetupMsixInterrupts(
-    _In_ WDFDEVICE Device,
-    _In_ PXDMA_DEVICE_CONTEXT DeviceContext,
-    _In_ WDFCMRESLIST ResourceList,
-    _In_ WDFCMRESLIST ResourceListTranslated
+    WDFDEVICE Device,
+    PXDMA_DEVICE_CONTEXT DeviceContext,
+    WDFCMRESLIST ResourceList,
+    WDFCMRESLIST ResourceListTranslated
     )
 {
     NTSTATUS status;
@@ -363,20 +364,22 @@ XdmaSetupMsixInterrupts(
     }
 
     // Program MSI-X vectors in hardware (similar to prog_irq_msix_channel/user)
+    PUCHAR baseAddr = (PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx];
     struct interrupt_regs *int_regs = 
-        (struct interrupt_regs *)((PUCHAR)DeviceContext->BarBaseVA[DeviceContext->ConfigBarIdx] + 
-                                XDMA_OFS_INT_CTRL);
+        (struct interrupt_regs *)((PUCHAR)((ULONG_PTR)baseAddr + XDMA_OFS_INT_CTRL));
 
     // Program channel vectors
     for (i = 0; i < DeviceContext->H2CChannelMax + DeviceContext->C2HChannelMax; i++) {
-        WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->channel_msi_vector[i/4],
-                            (i & 0x1f) << ((i % 4) * 8));
+        volatile ULONG* regAddr = (volatile PULONG)((PUCHAR)&int_regs->ChannelMsiVector + (i/4) * sizeof(ULONG));
+        ULONG value = (i & 0x1f) << ((i % 4) * 8);
+        WRITE_REGISTER_ULONG((PULONG)regAddr, value);
     }
 
     // Program user vectors
     for (i = 0; i < DeviceContext->UserMax; i++) {
-        WRITE_REGISTER_ULONG((volatile ULONG *)&int_regs->user_msi_vector[i/4],
-                            (i & 0x1f) << ((i % 4) * 8));
+        volatile ULONG* regAddr = (volatile PULONG)((PUCHAR)&int_regs->UserMsiVector + (i/4) * sizeof(ULONG));
+        ULONG value = (i & 0x1f) << ((i % 4) * 8);
+        WRITE_REGISTER_ULONG((PULONG)regAddr, value);
     }
 
     return STATUS_SUCCESS;
@@ -384,9 +387,9 @@ XdmaSetupMsixInterrupts(
 
 NTSTATUS
 XdmaEvtDevicePrepareHardware(
-    _In_ WDFDEVICE Device,
-    _In_ WDFCMRESLIST ResourceList,
-    _In_ WDFCMRESLIST ResourceListTranslated
+    WDFDEVICE Device,
+    WDFCMRESLIST ResourceList,
+    WDFCMRESLIST ResourceListTranslated
     )
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -435,13 +438,16 @@ XdmaEvtDevicePrepareHardware(
         // Try to identify if this is the config BAR
         if ((length >= XDMA_BAR_SIZE) && (deviceContext->ConfigBarIdx < 0)) {
             // Check if this BAR contains XDMA config registers
+            PUCHAR baseAddr = (PUCHAR)virtualAddress;
             struct interrupt_regs *irq_regs = 
-                (struct interrupt_regs *)((PUCHAR)virtualAddress + XDMA_OFS_INT_CTRL);
+                (struct interrupt_regs *)((PUCHAR)((ULONG_PTR)baseAddr + XDMA_OFS_INT_CTRL));
             struct config_regs *cfg_regs = 
-                (struct config_regs *)((PUCHAR)virtualAddress + XDMA_OFS_CONFIG);
+                (struct config_regs *)((PUCHAR)((ULONG_PTR)baseAddr + XDMA_OFS_CONFIG));
 
-            ULONG irq_id = READ_REGISTER_ULONG((volatile ULONG *)&irq_regs->identifier);
-            ULONG cfg_id = READ_REGISTER_ULONG((volatile ULONG *)&cfg_regs->identifier);
+            volatile ULONG *irqIdReg = (volatile PULONG)&irq_regs->Identifier;
+            volatile ULONG *cfgIdReg = (volatile PULONG)&cfg_regs->Identifier;
+            ULONG irq_id = READ_REGISTER_ULONG((PULONG)irqIdReg);
+            ULONG cfg_id = READ_REGISTER_ULONG((PULONG)cfgIdReg);
 
             if (((irq_id & 0xffff0000) == IRQ_BLOCK_ID) &&
                 ((cfg_id & 0xffff0000) == CONFIG_BLOCK_ID)) {
@@ -478,13 +484,20 @@ XdmaEvtDevicePrepareHardware(
     // Initialize H2C engines
     engineOffset = 0x0000;
     for (i = 0; i < deviceContext->H2CChannelMax; i++) {
-        status = XdmaEngineInit(&engine,
-                               deviceContext,
-                               engineOffset,
-                               TRUE,  // H2C
-                               i);
+        status = XdmaEngineCreate(Device,
+                                  deviceContext,
+                                  TRUE,  // H2C
+                                  i,
+                                  &engine);
+        if (!NT_SUCCESS(status)) {
+            DbgPrint("Failed to create H2C engine %d: 0x%x\n", i, status);
+            goto cleanup;
+        }
+        
+        status = XdmaEngineInit(engine, engineOffset, TRUE, i);
         if (!NT_SUCCESS(status)) {
             DbgPrint("Failed to initialize H2C engine %d: 0x%x\n", i, status);
+            ExFreePoolWithTag(engine, 'AMDX');
             goto cleanup;
         }
         deviceContext->H2CEngines[i] = engine;
@@ -494,13 +507,20 @@ XdmaEvtDevicePrepareHardware(
     // Initialize C2H engines
     engineOffset = 0x1000;
     for (i = 0; i < deviceContext->C2HChannelMax; i++) {
-        status = XdmaEngineInit(&engine,
-                               deviceContext,
-                               engineOffset,
-                               FALSE,  // C2H
-                               i);
+        status = XdmaEngineCreate(Device,
+                                  deviceContext,
+                                  FALSE,  // C2H
+                                  i,
+                                  &engine);
+        if (!NT_SUCCESS(status)) {
+            DbgPrint("Failed to create C2H engine %d: 0x%x\n", i, status);
+            goto cleanup;
+        }
+        
+        status = XdmaEngineInit(engine, engineOffset, FALSE, i);
         if (!NT_SUCCESS(status)) {
             DbgPrint("Failed to initialize C2H engine %d: 0x%x\n", i, status);
+            ExFreePoolWithTag(engine, 'AMDX');
             goto cleanup;
         }
         deviceContext->C2HEngines[i] = engine;
@@ -572,7 +592,7 @@ cleanup:
 
 static VOID
 XdmaCleanupInterrupts(
-    _In_ PXDMA_DEVICE_CONTEXT DeviceContext
+    PXDMA_DEVICE_CONTEXT DeviceContext
     )
 {
     ULONG i;
@@ -599,8 +619,8 @@ XdmaCleanupInterrupts(
 
 NTSTATUS
 XdmaEvtDeviceReleaseHardware(
-    _In_ WDFDEVICE Device,
-    _In_ WDFCMRESLIST ResourcesTranslated
+    WDFDEVICE Device,
+    WDFCMRESLIST ResourcesTranslated
     )
 {
     PXDMA_DEVICE_CONTEXT deviceContext;
@@ -651,8 +671,8 @@ XdmaEvtDeviceReleaseHardware(
 
 NTSTATUS
 XdmaEvtDeviceD0Entry(
-    _In_ WDFDEVICE Device,
-    _In_ WDF_POWER_DEVICE_STATE PreviousState
+    WDFDEVICE Device,
+    WDF_POWER_DEVICE_STATE PreviousState
     )
 {
     PAGED_CODE();
@@ -661,8 +681,8 @@ XdmaEvtDeviceD0Entry(
 
 NTSTATUS
 XdmaEvtDeviceD0Exit(
-    _In_ WDFDEVICE Device,
-    _In_ WDF_POWER_DEVICE_STATE TargetState
+    WDFDEVICE Device,
+    WDF_POWER_DEVICE_STATE TargetState
     )
 {
     PAGED_CODE();
@@ -672,20 +692,20 @@ XdmaEvtDeviceD0Exit(
 // Forward declaration of IOCTL handler from IoControl.c
 VOID
 XdmaIoDeviceControl(
-    _In_ WDFQUEUE Queue,
-    _In_ WDFREQUEST Request,
-    _In_ size_t OutputBufferLength,
-    _In_ size_t InputBufferLength,
-    _In_ ULONG IoControlCode
+    WDFQUEUE Queue,
+    WDFREQUEST Request,
+    size_t OutputBufferLength,
+    size_t InputBufferLength,
+    ULONG IoControlCode
     );
 
 VOID
 XdmaEvtIoDeviceControl(
-    _In_ WDFQUEUE Queue,
-    _In_ WDFREQUEST Request,
-    _In_ size_t OutputBufferLength,
-    _In_ size_t InputBufferLength,
-    _In_ ULONG IoControlCode
+    WDFQUEUE Queue,
+    WDFREQUEST Request,
+    size_t OutputBufferLength,
+    size_t InputBufferLength,
+    ULONG IoControlCode
     )
 {
     // Forward the IOCTL request to our comprehensive handler

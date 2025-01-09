@@ -26,12 +26,18 @@ Abstract:
 #define WPP_LEVEL_FLAGS_ENABLED(lvl, flags) \
     (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
 
-// Trace message format strings
-// XDMA-specific trace levels to avoid conflicts with Windows SDK
-#define XDMA_TRACE_LEVEL_ERROR        0
-#define XDMA_TRACE_LEVEL_WARNING      1
-#define XDMA_TRACE_LEVEL_INFORMATION  2
-#define XDMA_TRACE_LEVEL_VERBOSE      3
+// XDMA-specific trace levels with unique names to avoid conflicts with WPP
+#define XDMA_ERR_LEVEL        0  // Maps to WPP error level
+#define XDMA_WARN_LEVEL      1   // Maps to WPP warning level
+#define XDMA_INFO_LEVEL      2   // Maps to WPP information level
+#define XDMA_DBG_LEVEL       3   // Maps to WPP verbose level
+
+// Mapping macros to maintain compatibility with existing code
+// XDMA-specific trace level mappings
+#define XDMA_TRACE_ERROR     XDMA_ERR_LEVEL
+#define XDMA_TRACE_WARNING   XDMA_WARN_LEVEL
+#define XDMA_TRACE_INFO      XDMA_INFO_LEVEL
+#define XDMA_TRACE_VERBOSE   XDMA_DBG_LEVEL
 
 // This comment block is scanned by the trace preprocessor to define our
 // Trace function.
